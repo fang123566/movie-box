@@ -1,0 +1,142 @@
+/* Dashboard 专用样式 */
+.dashboard-header {
+    background: linear-gradient(135deg, #8B4513 0%, #6c757d 100%);
+    color: white;
+    padding: 30px 0;
+    margin-bottom: 30px;
+    border-radius: 0 0 20px 20px;
+}
+
+.quick-stats {
+    margin-bottom: 30px;
+}
+
+.feature-card {
+    text-align: center;
+    padding: 25px;
+    border-radius: 15px;
+    background: white;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s;
+    height: 100%;
+}
+
+.feature-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+}
+
+.feature-icon {
+    font-size: 3rem;
+    margin-bottom: 15px;
+    background: linear-gradient(135deg, #8B4513 0%, #6c757d 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.feature-title {
+    font-weight: 600;
+    margin-bottom: 10px;
+    color: #495057;
+}
+
+.feature-description {
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+/* 图表容器 */
+.chart-container {
+    background: white;
+    border-radius: 15px;
+    padding: 20px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    margin-bottom: 30px;
+}
+
+/* 最近活动 */
+.recent-activity {
+    background: white;
+    border-radius: 15px;
+    padding: 20px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.activity-item {
+    padding: 15px 0;
+    border-bottom: 1px solid #e9ecef;
+    display: flex;
+    align-items: center;
+}
+
+.activity-item:last-child {
+    border-bottom: none;
+}
+
+.activity-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #8B4513 0%, #6c757d 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    margin-right: 15px;
+}
+
+.activity-content {
+    flex: 1;
+}
+
+.activity-title {
+    font-weight: 600;
+    margin-bottom: 5px;
+}
+
+.activity-time {
+    color: #6c757d;
+    font-size: 0.85rem;
+}
+
+/* 搜索和筛选 */
+.search-box {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.search-box input {
+    padding-left: 40px;
+}
+
+.search-box i {
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #6c757d;
+}
+
+/* 分页样式 */
+.pagination {
+    justify-content: center;
+    margin-top: 30px;
+}
+
+.page-link {
+    border: none;
+    color: #8B4513;
+    padding: 8px 16px;
+    margin: 0 2px;
+    border-radius: 8px;
+}
+
+.page-link:hover {
+    background-color: #8B4513;
+    color: white;
+}
+
+.page-item.active .page-link {
+    background-color: #8B4513;
+    border-color: #8B4513;
+}

@@ -1,0 +1,56 @@
+/* static/css/login.css */
+body {
+    background-image: url("../images/login-bg.jpg");
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    min-height: 100vh;
+    margin: 0;
+    padding: 0;
+    background-color: transparent !important; /* 确保背景颜色透明 */
+}
+
+/* 移除渐变背景，使用图片背景 */
+.login-container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: transparent !important; /* 重要：移除渐变背景 */
+}
+
+.login-card {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 15px;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    max-width: 400px;
+    width: 100%;
+}
+
+.login-header {
+    background: linear-gradient(135deg, #8B4513 0%, #764ba2 100%);
+    color: white;
+    text-align: center;
+    padding: 30px;
+}
+
+.login-body {
+    padding: 30px;
+}
+
+/* 确保遮罩层在正确的位置 */
+body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: -1;
+}

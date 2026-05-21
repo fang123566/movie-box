@@ -1,0 +1,133 @@
+{% extends "layout.html" %}
+{% block title %}账户设置{% endblock %}
+
+{% block extra_css %}
+<style>
+.page-bg {
+    min-height: 100vh;
+    background: url("{{ url_for('static', filename='images/ScreenShot_2026-05-20_193142_750.png') }}") center center / cover no-repeat fixed;
+    padding: 32px 0 48px;
+}
+.page-bg::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: rgba(10,8,6,.55);
+    pointer-events: none;
+    z-index: 0;
+}
+.page-bg > .container { position: relative; z-index: 1; }
+.settings-card { max-width: 560px; margin: 0 auto; }
+.settings-card .card {
+    background: rgba(255,255,255,.93);
+    backdrop-filter: blur(8px);
+}
+.section-title {
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 1px;
+    color: #8B7355; text-transform: uppercase; margin-bottom: 14px;
+    padding-bottom: 6px; border-bottom: 2px solid #e8ddd0;
+}
+.form-label { font-weight: 600; font-size: 0.88rem; color: #555; }
+.strength-bar { height: 4px; border-radius: 2px; transition: all 0.3s; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-bg">
+<div class="container">
+  <div class="settings-card">
+
+    <!-- 修改密码 -->
+    <div class="card shadow-sm border-0 mb-4" style="border-radius:14px;">
+      <div class="card-body p-4">
+        <p class="section-title"><i class="fas fa-lock me-1"></i> 修改密码</p>
+        <div id="pwdAlert"></div>
+        <form id="pwdForm">
+          <div class="mb-3">
+            <label class="form-label">当前密码</label>
+            <input type="password" class="form-control form-control-sm" id="oldPwd" placeholder="输入当前密码" required>
+          </div>
+          <div class="mb-2">
+            <label class="form-label">新密码</label>
+            <input type="password" class="form-control form-control-sm" id="newPwd" placeholder="至少 8 位" required>
+            <div class="mt-1"><div class="strength-bar bg-secondary w-0" id="strengthBar"></div></div>
+            <small class="text-muted" id="strengthText"></small>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">确认新密码</label>
+            <input type="password" class="form-control form-control-sm" id="confirmPwd" placeholder="再次输入新密码" required>
+          </div>
+          <button type="submit" class="btn btn-sm px-4" style="background:linear-gradient(135deg,#8B7355,#696969);color:white;border:none;border-radius:8px;">
+            <i class="fas fa-key me-1"></i> 更新密码
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- 安全信息（只读展示） -->
+    <div class="card shadow-sm border-0 mb-4" style="border-radius:14px;">
+      <div class="card-body p-4">
+        <p class="section-title"><i class="fas fa-shield-alt me-1"></i> 安全信息</p>
+        <table class="table table-sm table-borderless" style="font-size:0.85rem;">
+          <tbody>
+            <tr><td class="text-muted w-40">密码加密方式</td><td><span class="badge" style="background:#8B7355;">PBKDF2-SHA256</span></td></tr>
+            <tr><td class="text-muted">数据传输</td><td><span class="badge bg-secondary">AES-256 Fernet</span></td></tr>
+            <tr><td class="text-muted">登录限速</td><td><span class="badge bg-secondary">10次/分钟（IP 级）</span></td></tr>
+            <tr><td class="text-muted">会话保护</td><td><span class="badge bg-secondary">Flask SecureSession</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <a href="{{ url_for('dashboard') }}" class="btn btn-sm btn-outline-secondary" style="border-radius:8px;">
+      <i class="fas fa-arrow-left me-1"></i> 返回首页
+    </a>
+  </div>
+</div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// 密码强度检测
+document.getElementById('newPwd').addEventListener('input', function() {
+    const v = this.value;
+    let score = 0;
+    if (v.length >= 8) score++;
+    if (/[A-Z]/.test(v)) score++;
+    if (/[0-9]/.test(v)) score++;
+    if (/[^A-Za-z0-9]/.test(v)) score++;
+    const bar = document.getElementById('strengthBar');
+    const txt = document.getElementById('strengthText');
+    const pct = ['0%','25%','50%','75%','100%'][score];
+    const colors = ['bg-secondary','bg-danger','bg-warning','bg-info','bg-success'];
+    const labels = ['','弱','一般','较强','强'];
+    bar.className = `strength-bar ${colors[score]}`;
+    bar.style.width = pct;
+    txt.textContent = labels[score] ? `密码强度：${labels[score]}` : '';
+});
+
+document.getElementById('pwdForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const np = document.getElementById('newPwd').value;
+    const cp = document.getElementById('confirmPwd').value;
+    const area = document.getElementById('pwdAlert');
+    if (np !== cp) {
+        area.innerHTML = '<div class="alert alert-danger py-2 px-3" style="font-size:0.85rem;">两次密码不一致</div>';
+        return;
+    }
+    if (np.length < 8) {
+        area.innerHTML = '<div class="alert alert-danger py-2 px-3" style="font-size:0.85rem;">新密码至少 8 位</div>';
+        return;
+    }
+    const res = await fetch('/api/change-password', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ old_password: document.getElementById('oldPwd').value, new_password: np })
+    });
+    const d = await res.json();
+    area.innerHTML = `<div class="alert ${d.success?'alert-success':'alert-danger'} py-2 px-3" style="font-size:0.85rem;">${d.message}</div>`;
+    if (d.success) { document.getElementById('pwdForm').reset(); document.getElementById('strengthBar').style.width='0'; document.getElementById('strengthText').textContent=''; }
+    setTimeout(() => area.innerHTML='', 4000);
+});
+</script>
+{% endblock %}

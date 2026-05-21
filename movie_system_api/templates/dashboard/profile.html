@@ -1,0 +1,146 @@
+{% extends "layout.html" %}
+{% block title %}个人资料{% endblock %}
+
+{% block extra_css %}
+<style>
+.page-bg {
+    min-height: 100vh;
+    background: url("{{ url_for('static', filename='images/ScreenShot_2026-05-20_193142_750.png') }}") center center / cover no-repeat fixed;
+    padding: 32px 0 48px;
+}
+.page-bg::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: rgba(10,8,6,.55);
+    pointer-events: none;
+    z-index: 0;
+}
+.page-bg > .container { position: relative; z-index: 1; }
+.profile-card { max-width: 680px; margin: 0 auto; }
+.profile-card .card {
+    background: rgba(255,255,255,.93);
+    backdrop-filter: blur(8px);
+}
+.avatar-circle {
+    width: 80px; height: 80px; border-radius: 50%;
+    background: linear-gradient(135deg, #8B7355, #696969);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 2rem; font-weight: 700; color: white; margin: 0 auto 16px;
+}
+.form-label { font-weight: 600; font-size: 0.88rem; color: #555; }
+.section-title {
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 1px;
+    color: #8B7355; text-transform: uppercase; margin-bottom: 14px;
+    padding-bottom: 6px; border-bottom: 2px solid #e8ddd0;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-bg">
+<div class="container">
+  <div class="profile-card">
+    <div class="card shadow-sm border-0" style="border-radius:14px;">
+      <div class="card-body p-4">
+        <div class="text-center mb-4">
+          <div class="avatar-circle" id="avatarCircle">?</div>
+          <h5 class="mb-0 fw-bold" id="displayName">加载中...</h5>
+          <small class="text-muted" id="displayRole"></small>
+        </div>
+
+        <div id="alertArea"></div>
+
+        <p class="section-title">基本信息</p>
+        <form id="profileForm">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">用户名</label>
+              <input type="text" class="form-control form-control-sm" id="username" readonly style="background:#f8f8f8;">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">昵称</label>
+              <input type="text" class="form-control form-control-sm" id="nickname" placeholder="请输入昵称">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">年龄</label>
+              <input type="number" class="form-control form-control-sm" id="age" min="1" max="120" placeholder="年龄">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">性别</label>
+              <select class="form-select form-select-sm" id="gender">
+                <option value="">不填</option>
+                <option value="male">男</option>
+                <option value="female">女</option>
+                <option value="other">其他</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">偏好类型</label>
+              <select class="form-select form-select-sm" id="favoriteGenre">
+                <option value="">不限</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">注册时间</label>
+              <input type="text" class="form-control form-control-sm" id="registerDate" readonly style="background:#f8f8f8;">
+            </div>
+          </div>
+          <div class="mt-4 d-flex gap-2">
+            <button type="submit" class="btn btn-sm px-4" style="background:linear-gradient(135deg,#8B7355,#696969);color:white;border:none;border-radius:8px;">
+              <i class="fas fa-save me-1"></i> 保存修改
+            </button>
+            <a href="{{ url_for('dashboard') }}" class="btn btn-sm btn-outline-secondary" style="border-radius:8px;">返回首页</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function loadProfile() {
+  const res = await fetch('/api/profile');
+  if (!res.ok) { location.href = '/'; return; }
+  const d = await res.json();
+  document.getElementById('avatarCircle').textContent = (d.username||'?')[0].toUpperCase();
+  document.getElementById('displayName').textContent = d.nickname || d.username || '';
+  document.getElementById('displayRole').textContent = d.role === 'admin' ? '管理员' : '普通用户';
+  document.getElementById('username').value = d.username || '';
+  document.getElementById('nickname').value = d.nickname || '';
+  document.getElementById('age').value = d.age || '';
+  document.getElementById('gender').value = d.gender || '';
+  document.getElementById('registerDate').value = d.register_date ? d.register_date.substring(0,10) : '';
+  // load genres
+  const gr = await fetch('/api/genres');
+  const gd = await gr.json();
+  const sel = document.getElementById('favoriteGenre');
+  (gd.genres||[]).forEach(g => {
+    const opt = document.createElement('option');
+    opt.value = g.genre_id; opt.textContent = g.genre_name;
+    if (g.genre_id === d.favorite_genre_id) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+document.getElementById('profileForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const body = {
+    nickname: document.getElementById('nickname').value,
+    age: parseInt(document.getElementById('age').value) || null,
+    gender: document.getElementById('gender').value || null,
+    favorite_genre_id: parseInt(document.getElementById('favoriteGenre').value) || null
+  };
+  const res = await fetch('/api/profile', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  const d = await res.json();
+  const area = document.getElementById('alertArea');
+  area.innerHTML = `<div class="alert ${d.success?'alert-success':'alert-danger'} py-2 px-3" style="font-size:0.85rem;">${d.message}</div>`;
+  setTimeout(() => area.innerHTML='', 3000);
+  if (d.success) { document.getElementById('displayName').textContent = body.nickname || document.getElementById('username').value; }
+});
+
+loadProfile();
+</script>
+{% endblock %}

@@ -1,0 +1,543 @@
+/* 全局样式 */
+body {
+    background-color: #f8f9fa;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* 导航栏样式 */
+.navbar-brand {
+    font-weight: bold;
+    font-size: 1.5rem;
+}
+
+/* 卡片样式 */
+.card {
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(139, 69, 19, 0.1);
+    transition: transform 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+}
+
+.card-header {
+    background: linear-gradient(135deg, #6c757d 0%, #F5E6D3 100%);
+    color: white;
+    border-radius: 10px 10px 0 0 !important;
+    font-weight: 600;
+}
+
+/* 统计卡片 */
+.stats-card {
+    text-align: center;
+    padding: 20px;
+}
+
+.stats-number {
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: #8B4513;
+    margin: 10px 0;
+}
+
+.stats-label {
+    color: #6c757d;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* 表格样式 */
+.table th {
+    border-top: none;
+    font-weight: 600;
+    color: #81a6b1;
+    background-color: #f8f9fa;
+}
+
+.table-hover tbody tr:hover {
+    background-color: rgba(139, 69, 19, 0.1);
+}
+
+/* 按钮样式 */
+.btn-primary {
+    background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
+    border: none;
+    border-radius: 25px;
+    padding: 8px 20px;
+}
+
+.btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(139, 69, 19, 0.3);
+}
+
+/* 登录页面样式 - 半透明版本 */
+.login-container {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.login-card {
+    background: rgba(255, 255, 255, 0.15) !important;
+    backdrop-filter: blur(15px);
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    border-radius: 15px;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2) !important;
+    overflow: hidden;
+    max-width: 400px;
+    width: 100%;
+    color: white !important; /* 确保文字在深色背景上可见 */
+}
+
+.login-header {
+    background: rgba(139, 69, 19, 0.7) !important;
+    backdrop-filter: blur(10px);
+    color: white;
+    text-align: center;
+    padding: 30px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.login-header i {
+    font-size: 3rem;
+    margin-bottom: 15px;
+}
+
+.login-body {
+    padding: 30px;
+    background: transparent !important;
+    color: white !important;
+}
+
+/* 半透明输入框样式 */
+.login-container .form-control {
+    border-radius: 25px;
+    padding: 12px 20px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.1) !important;
+    color: white !important;
+    transition: all 0.3s;
+}
+
+.login-container .form-control:focus {
+    border-color: rgba(255, 255, 255, 0.6);
+    background: rgba(255, 255, 255, 0.15) !important;
+    box-shadow: 0 0 0 0.2rem rgba(255, 255, 255, 0.1);
+    color: white !important;
+}
+
+.login-container .form-control::placeholder {
+    color: rgba(255, 255, 255, 0.7) !important;
+}
+
+/* 表单标签样式 */
+.login-container .form-label {
+    color: white !important;
+    font-weight: 600;
+}
+
+/* 链接和文字样式 */
+.login-container .text-muted {
+    color: rgba(255, 255, 255, 0.8) !important;
+}
+
+.login-container .text-muted a {
+    color: #D2B48C !important;
+    font-weight: 600;
+}
+
+.login-container .text-muted a:hover {
+    color: #F5E6D3 !important;
+}
+
+/* 半透明选择框 */
+.login-container .modern-select {
+    background: rgba(255, 255, 255, 0.1) !important;
+    border: 2px solid rgba(255, 255, 255, 0.3) !important;
+    color: white !important;
+    border-radius: 10px;
+    padding: 12px 15px;
+    backdrop-filter: blur(5px);
+}
+
+.login-container .modern-select:focus {
+    border-color: rgba(255, 255, 255, 0.6) !important;
+    background: rgba(255, 255, 255, 0.15) !important;
+    box-shadow: 0 0 0 0.2rem rgba(255, 255, 255, 0.1) !important;
+}
+
+.login-container .modern-select option {
+    background: #8B4513;
+    color: white;
+}
+
+/* 按钮在半透明背景下的样式 */
+.login-container .btn-primary {
+    background: linear-gradient(135deg, rgba(139, 69, 19, 0.8) 0%, rgba(160, 82, 45, 0.8) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 25px;
+    padding: 12px 20px;
+    color: white;
+    font-weight: 600;
+    backdrop-filter: blur(5px);
+}
+
+.login-container .btn-primary:hover {
+    background: linear-gradient(135deg, rgba(139, 69, 19, 0.9) 0%, rgba(160, 82, 45, 0.9) 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(139, 69, 19, 0.4);
+}
+
+/* 错误提示框在半透明背景下的样式 */
+.login-container .alert-danger {
+    background: rgba(220, 53, 69, 0.8) !important;
+    border: 1px solid rgba(220, 53, 69, 0.5) !important;
+    color: white !important;
+    backdrop-filter: blur(5px);
+    border-radius: 10px;
+}
+
+/* 帮助文字样式 */
+.login-container .form-text {
+    color: rgba(255, 255, 255, 0.7) !important;
+    font-size: 0.85rem;
+}
+
+/* 确保所有输入文字为白色 */
+.login-container input,
+.login-container select,
+.login-container textarea {
+    color: white !important;
+}
+
+/* 输入框图标颜色 */
+.login-container .input-group-text {
+    background: rgba(255, 255, 255, 0.1) !important;
+    border: 2px solid rgba(255, 255, 255, 0.3) !important;
+    color: rgba(255, 255, 255, 0.8) !important;
+}
+
+/* 评分星星 */
+.rating-stars {
+    color: #D2691E; /* 棕色系的星星 */
+}
+
+/* 电影卡片 */
+.movie-card {
+    transition: transform 0.3s;
+    cursor: pointer;
+}
+
+.movie-card:hover {
+    transform: scale(1.05);
+}
+
+.movie-poster {
+    height: 200px;
+    background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 3rem;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .container-fluid {
+        padding: 10px;
+    }
+
+    .stats-number {
+        font-size: 2rem;
+    }
+
+    .table-responsive {
+        font-size: 0.9rem;
+    }
+}
+
+/* 加载动画 */
+.loading {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #8B4513;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* 徽章样式 */
+.badge {
+    font-size: 0.75em;
+    padding: 5px 10px;
+    border-radius: 15px;
+}
+
+/* 现代化卡片设计 */
+.modern-card {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(139, 69, 19, 0.2);
+    border-radius: 20px;
+    box-shadow: 0 8px 32px rgba(139, 69, 19, 0.1);
+    transition: all 0.3s ease;
+}
+
+.modern-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 40px rgba(139, 69, 19, 0.15);
+}
+
+/* 渐变按钮 */
+.gradient-btn {
+    background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
+    border: none;
+    border-radius: 50px;
+    padding: 12px 30px;
+    color: white;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.gradient-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(139, 69, 19, 0.3);
+}
+
+/* 现代化表格 */
+.modern-table {
+    border-radius: 15px;
+    overflow: hidden;
+}
+
+.modern-table th {
+    background: linear-gradient(135deg, #6c757d 0%, #F5E6D3 100%);
+    color: white;
+    border: none;
+    padding: 15px;
+    font-weight: 600;
+}
+
+.modern-table td {
+    padding: 12px 15px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+/* 搜索框美化 */
+.modern-search {
+    position: relative;
+    border-radius: 50px;
+    overflow: hidden;
+    box-shadow: 0 5px 15px rgba(139, 69, 19, 0.1);
+}
+
+.modern-search input {
+    border: none;
+    padding: 15px 20px 15px 50px;
+    background: white;
+}
+
+.modern-search i {
+    position: absolute;
+    left: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #8B4513;
+}
+
+/* 统计卡片美化 */
+.stats-card-modern {
+    text-align: center;
+    padding: 30px 20px;
+    border-radius: 20px;
+    background: linear-gradient(135deg, white 0%, rgba(139, 69, 19, 0.25) 100%);
+    color: white;
+    position: relative;
+    overflow: hidden;
+}
+
+.stats-card-modern::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: rgba(255, 255, 255, 0.1);
+    transform: rotate(45deg);
+}
+
+.stats-number-modern {
+    font-size: 2.5rem;
+    font-weight: bold;
+    margin: 15px 0;
+    position: relative;
+}
+
+/* 导航栏美化 */
+.navbar-modern {
+    background: rgba(255, 255, 255, 0.95) !important;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 5px 20px rgba(139, 69, 19, 0.1);
+}
+
+/* 加载动画美化 */
+.loading-modern {
+    width: 40px;
+    height: 40px;
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #8B4513;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto;
+}
+
+/* 棕色系表单选择框 */
+.modern-select {
+    border-radius: 10px;
+    border: 2px solid #e9ecef;
+    padding: 10px 15px;
+    transition: all 0.3s;
+}
+
+.modern-select:focus {
+    border-color: #8B4513;
+    box-shadow: 0 0 0 0.2rem rgba(139, 69, 19, 0.25);
+}
+
+/* 棕色系输入框 */
+.modern-input {
+    border-radius: 10px;
+    border: 2px solid #e9ecef;
+    padding: 10px 15px;
+    transition: all 0.3s;
+}
+
+.modern-input:focus {
+    border-color: #8B4513;
+    box-shadow: 0 0 0 0.2rem rgba(139, 69, 19, 0.25);
+}
+
+/* ============================================
+   热门电影海报网格 (Hot Movies Grid)
+   ============================================ */
+.hot-movies-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 14px;
+    padding: 4px 0;
+}
+@media (max-width: 1200px) { .hot-movies-grid { grid-template-columns: repeat(4, 1fr); } }
+@media (max-width: 900px)  { .hot-movies-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 600px)  { .hot-movies-grid { grid-template-columns: repeat(2, 1fr); } }
+
+.hm-card {
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 3px 10px rgba(0,0,0,.12);
+    transition: transform .22s, box-shadow .22s;
+    cursor: pointer;
+    background: #fff;
+}
+.hm-card:hover {
+    transform: translateY(-5px) scale(1.02);
+    box-shadow: 0 10px 28px rgba(0,0,0,.2);
+}
+.hm-poster {
+    position: relative;
+    width: 100%;
+    padding-top: 148%;  /* 2:3 比例 */
+    overflow: hidden;
+}
+.hm-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+.hm-fallback {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: rgba(255,255,255,.9);
+    letter-spacing: 2px;
+    text-shadow: 0 2px 8px rgba(0,0,0,.3);
+}
+.hm-overlay {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    background: linear-gradient(transparent, rgba(0,0,0,.65));
+    padding: 20px 8px 6px;
+    display: flex;
+    justify-content: flex-end;
+}
+.hm-score {
+    background: rgba(255,193,7,.92);
+    color: #222;
+    font-size: .72rem;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+.hm-info {
+    padding: 7px 8px 8px;
+}
+.hm-title {
+    font-size: .82rem;
+    font-weight: 600;
+    color: #2d3748;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.hm-meta {
+    font-size: .72rem;
+    color: #94a3b8;
+    margin-top: 2px;
+}
+.hm-stars {
+    font-size: .7rem;
+    color: #f59e0b;
+    margin-top: 2px;
+    letter-spacing: 1px;
+}
+
+/* 用户头像小圆 */
+.user-avatar-sm {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .85rem;
+    font-weight: 700;
+}
+
+/* 棕色系文字 */
+.modern-text {
+    color: #8B4513;
+    font-weight: 500;
+}

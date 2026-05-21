@@ -1,0 +1,7 @@
+.env
+backups/
+__pycache__/
+*.pyc
+.idea/
+*.bak
+movie_system_api/logs/
