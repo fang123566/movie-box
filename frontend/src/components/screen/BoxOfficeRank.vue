@@ -9,7 +9,7 @@
   <div class="borank">
     <div class="borank__head">
       <span class="borank__head-zh">全球票房榜</span>
-      <span class="borank__head-en">TOP 10 · TMDB 口径</span>
+      <span class="borank__head-en">TOP 10</span>
     </div>
     <div class="borank__list">
       <div
@@ -26,12 +26,7 @@
         <span v-if="g.roi" class="borank__roi" :class="{ 'is-hot': g.roi >= 5 }">{{ g.roi }}×</span>
       </div>
     </div>
-    <p v-if="!rows.length" class="borank__empty">暂无票房数据（TMDB 仅对部分影片给出 revenue）</p>
-    <p class="borank__foot">
-      口径说明：票房为 TMDB 记录的全球累计（美元），仅覆盖有数据的
-      {{ totalMovies }} 部；ROI = 票房 ÷ 预算，缺预算的老片不显示。
-      点击任意一行可在中央画廊打开该片档案。
-    </p>
+    <p v-if="!rows.length" class="borank__empty">暂无票房数据</p>
   </div>
 </template>
 
@@ -119,7 +114,6 @@ const rows = computed(() => {
 }
 .borank__roi.is-hot { color: #C2410C; background: rgba(194, 65, 12, 0.12); }
 .borank__empty { font-size: 11.5px; color: var(--u-text-2, #7D6B52); padding: 12px 4px; }
-.borank__foot { font-size: 10px; line-height: 1.5; color: rgba(125, 107, 82, 0.85); padding-top: 8px; }
 
 @media (prefers-reduced-motion: reduce) {
   .borank__row { animation: none; }

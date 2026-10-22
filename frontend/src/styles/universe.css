@@ -523,7 +523,8 @@ body.u-body-lock .app-main > * { flex: 1; min-height: 0; }
   -webkit-mask-image: linear-gradient(to right, transparent, #000 4%, #000 96%, transparent);
 }
 /* 横向滚动流：纯 CSS animation（JS 只在数据变化时填充内容）。
-   95s/轮：用户 2026-10-19 反馈 46s 太快读不完，放慢到约 1/2 速 */
+   恒速由 JS 按轨道实测宽度反推 animation-duration（STREAM_PX_PER_SEC=45px/s），
+   内容增减速度恒定；兜底 160s/轮，用户 2026-10-22 反馈再慢一点 */
 .stream-track {
   display: flex;
   gap: 14px;

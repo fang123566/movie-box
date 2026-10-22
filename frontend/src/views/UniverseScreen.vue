@@ -365,7 +365,7 @@ const panelMeta = {
   story:   { zh: '叙事时间轴',   en: '年代影片叙事',       tab: '年代故事', comp: 'StoryTimeline' },
   rank:    { zh: '类型口碑榜',   en: '各类型口碑评分',     tab: '类型口碑', comp: 'GenreRankCard' },
   coverage:{ zh: '预告覆盖',     en: '高分片预告触达',     tab: '预告覆盖', comp: 'CoveragePanel' },
-  boxrank: { zh: '全球票房榜',   en: 'TOP 10 · TMDB 口径', tab: '票房榜',   comp: 'BoxOfficeRank' },
+  boxrank: { zh: '全球票房榜',   en: 'TOP 10', tab: '票房榜',   comp: 'BoxOfficeRank' },
   boxtrend:{ zh: '年度票房',     en: '上映年合计 · 亿美元', tab: '年度趋势', comp: 'BoxOfficeTrend' },
 }
 const view = ref('galaxy')
@@ -442,13 +442,13 @@ const chips = computed(() => reviews.value.map((r) => ({
 })))
 const loopChips = computed(() => (chips.value.length ? [...chips.value, ...chips.value] : []))
 
-/* ---------- 影评流恒速（用户两次反馈"太快"） ----------
+/* ---------- 影评流恒速（用户三次反馈"太快/慢一点"） ----------
    固定秒数在内容量变化时会漂：174 条长文 + 95s 实测 1319px/s（≈110 字/秒），
    快成老虎机。改为测量轨道实际宽度，按恒定像素速度反推 animation-duration：
-   75px/s ≈ 6 字/秒（中文舒适阅读节奏），内容增减速度恒定。
+   45px/s ≈ 3.5 字/秒（比 75px/s 再降四成，中文慢读节奏），内容增减速度恒定。
    注意 keyframes 位移是 -50%（一圈=一份 chips），所以每圈内容宽 = scrollWidth/2。 */
-const STREAM_PX_PER_SEC = 75
-const streamDur = ref('95s') // CSS 兜底值：JS 测量完成前先用它
+const STREAM_PX_PER_SEC = 45
+const streamDur = ref('160s') // CSS 兜底值：JS 测量完成前先用它
 watch(loopChips, async () => {
   await nextTick()
   const track = document.querySelector('.stream-track')

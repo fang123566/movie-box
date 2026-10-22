@@ -126,10 +126,7 @@ function onWord(w) {
 
     <!-- 口碑温度计 -->
     <section v-if="avgRating !== null" class="aside-card">
-      <h3 class="aside-card__title">
-        当前结果口碑
-        <span class="aside-card__hint">影片均分口径</span>
-      </h3>
+      <h3 class="aside-card__title">当前结果口碑</h3>
       <div class="gauge">
         <div class="gauge__track">
           <div class="gauge__fill" :class="gaugeLevel.cls" :style="{ width: gaugePct + '%' }" />
@@ -140,7 +137,6 @@ function onWord(w) {
           <span class="gauge__label" :class="gaugeLevel.cls">{{ gaugeLevel.label }}</span>
         </div>
       </div>
-      <p class="aside-card__note">基于当前 {{ rated.length }} 部有评分影片的均分</p>
     </section>
 
     <!-- 相关搜索 -->

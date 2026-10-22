@@ -348,7 +348,7 @@ function check(name, ok, extra = '') {
   check('票房画廊相框上架', bog.frames === 24 && bog.pins === 24 && bog.line, `frames=${bog.frames} pins=${bog.pins}`)
   check('相框海报加载', bog.posters >= 20, `posters=${bog.posters}/24`)
   check('相框 caption 为真实片名', bog.caps.length === 3 && bog.caps[0].length >= 2, JSON.stringify(bog.caps))
-  check('总览条有样本数', /票房样本/.test(bog.summary || ''), (bog.summary || '').slice(0, 40))
+  check('总览条有收录数', /收录影片/.test(bog.summary || ''), (bog.summary || '').slice(0, 40))
   check('左翼票房榜十行', bog.rankRows === 10, `rows=${bog.rankRows}`)
   check('右翼年度趋势图渲染', bog.trendCanvas > 100, `canvas=${bog.trendCanvas}`)
 

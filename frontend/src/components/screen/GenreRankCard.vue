@@ -21,10 +21,6 @@
       </div>
     </div>
     <p v-if="!rows.length" class="grank__empty">暂无类型口碑数据</p>
-    <p class="grank__foot">
-      口径说明：Kaggle 影评无电影 ID，无法按类型汇总影评情感，
-      此处取电影侧均分（IMDb/TMDB），不是影评情感 —— 两回事，分开说。
-    </p>
   </div>
 </template>
 
@@ -88,5 +84,4 @@ const rows = computed(() => {
 .grank__n { font-size: 10px; color: rgba(125, 107, 82, 0.85); text-align: right; }
 
 .grank__empty { flex: 1; display: grid; place-items: center; font-size: 12px; color: var(--u-text-2); }
-.grank__foot { flex: none; margin: 8px 0 0; font-size: 10px; line-height: 1.65; color: rgba(125, 107, 82, 0.8); }
 </style>

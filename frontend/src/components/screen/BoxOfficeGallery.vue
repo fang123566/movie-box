@@ -17,9 +17,9 @@
 -->
 <template>
   <div class="bog" :class="{ 'is-mobile': isNarrow }">
-    <!-- 总览条：样本量 / 总票房 / 最旺年份 -->
+    <!-- 总览条：收录数 / 总票房 / 最旺年份 -->
     <div class="bog__summary">
-      <span class="bog__stat">票房样本 <b>{{ totalMovies }}</b> 部</span>
+      <span class="bog__stat">收录影片 <b>{{ totalMovies }}</b> 部</span>
       <span class="bog__stat">合计 <b>{{ yi(totalRevenue) }}</b> 亿美元</span>
       <span class="bog__stat">最旺年份 <b>{{ topYear || '—' }}</b></span>
       <span class="bog__hint">滚轮沿绳浏览 · 点相框看详情</span>
@@ -90,7 +90,6 @@
             <RouterLink class="bog-card__link" :to="`/movie/${encodeURIComponent(sel.movie_id)}`">
               查看影片详情 →
             </RouterLink>
-            <span class="bog-card__note">票房为 TMDB 口径（美元）</span>
           </div>
         </div>
       </div>
@@ -451,7 +450,7 @@ function onPosterError(e) { e.target.style.display = 'none' }
 .bog-card__foot {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 10px;
   margin-top: 14px;
 }
@@ -467,7 +466,6 @@ function onPosterError(e) { e.target.style.display = 'none' }
   box-shadow: 0 3px 10px rgba(139, 69, 19, 0.38);
 }
 .bog-card__link:hover { filter: brightness(1.08); }
-.bog-card__note { font-size: 10.5px; color: rgba(125, 107, 82, 0.8); }
 
 /* 纸卡弹簧入场 */
 .bog-card-enter-active { transition: transform 0.34s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.24s ease; }

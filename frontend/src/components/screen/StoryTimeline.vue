@@ -32,7 +32,7 @@
     <!-- 底部结论 -->
     <div class="story__foot">
       <div class="story__foot-item">
-        <span class="story__foot-k">样本总量</span>
+        <span class="story__foot-k">影片总量</span>
         <span class="story__foot-v"><RollingNumber :value="totalMovies" :duration="1600" /></span>
       </div>
       <div class="story__foot-item">
@@ -85,7 +85,7 @@ const ledeText = computed(() => {
   if (!r.length) return '暂无年代数据'
   const peak = r.reduce((a, b) => (b.movies > a.movies ? b : a))
   const share = totalMovies.value ? Math.round((peak.movies / totalMovies.value) * 100) : 0
-  return `样本重心落在 ${peak.decade} 年代，占全库 ${share}%`
+  return `影片重心落在 ${peak.decade} 年代，占全库 ${share}%`
 })
 </script>
 

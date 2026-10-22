@@ -1,9 +1,9 @@
 <!--
   票房分析展厅 · 右翼面板：年度票房趋势
   ============================================================
-  ECharts 柱状图：每年上映影片的票房合计（仅统计有票房数据的影片）。
+  ECharts 柱状图：每年上映影片的票房合计。
   走 useChart 底座（computed option + watch 补绘 —— 异步接口数据的既定约定）。
-  峰值年份用强调色标出，并在脚注给出解读口径。
+  峰值年份用强调色标出。x 轴年份自动抽稀（40+ 个标签全显会挤成一团）。
 -->
 <template>
   <div class="botrend">
@@ -14,12 +14,6 @@
     <div ref="el" class="botrend__chart" />
     <p v-if="peak" class="botrend__peak">
       峰值 <b>{{ peak.year }}</b> 年 · <b>{{ yi(peak.revenue) }}</b> 亿美元
-      <template v-if="peak.movies">（{{ peak.movies }} 部有票房影片）</template>
-    </p>
-    <p class="botrend__foot">
-      口径说明：仅统计 TMDB 给出票房的影片；早年年份影片少、数据稀疏，
-      柱高低不代表当年电影业全貌。总票房 {{ yi(totalRevenue) }} 亿美元 /
-      {{ totalMovies }} 部样本。
     </p>
   </div>
 </template>
@@ -74,7 +68,9 @@ const option = computed(() => ({
     data: rows.value.map((y) => y.year),
     axisLine: { lineStyle: { color: U.grid } },
     axisTick: { show: false },
-    axisLabel: { color: U.text2, fontSize: 9.5, interval: 0, rotate: rows.value.length > 12 ? 50 : 0 },
+    // 抽稀由 echarts autoSkip 决定（不写 interval: 0）：40+ 个年份标签在 340px
+    // 面板里全显必然重叠成糊，rotate 也随标签密度收斂到 30°
+    axisLabel: { color: U.text2, fontSize: 9.5, rotate: rows.value.length > 12 ? 30 : 0 },
   },
   yAxis: {
     type: 'value',
@@ -108,7 +104,6 @@ watch(option, (o) => set(o), { deep: true })
 .botrend__head-zh { font-size: 13px; font-weight: 800; color: var(--u-text, #3A2E20); letter-spacing: 0.04em; }
 .botrend__head-en { font-size: 10px; color: var(--u-text-2, #7D6B52); letter-spacing: 0.06em; }
 .botrend__chart { flex: 1; min-height: 120px; }
-.botrend__peak { margin: 6px 0 0; font-size: 11.5px; color: var(--u-text, #3A2E20); }
+.botrend__peak { margin: 6px 0 0; font-size: 11.5px; color: var(--u-text, #3A2E20); padding-bottom: 4px; }
 .botrend__peak b { color: #C2410C; font-size: 13px; }
-.botrend__foot { font-size: 10px; line-height: 1.5; color: rgba(125, 107, 82, 0.85); padding-top: 6px; }
 </style>
