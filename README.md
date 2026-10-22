@@ -12,9 +12,8 @@ Wikipedia API、Kaggle 公开影评），不涉及任何反爬平台。
 git 提交 `9723066`）** 基础上扩展的大数据版本：原系统作蓝本，新栈承载——
 继承原系统的信息架构（导航分工、页面组织）与棕灰主题视觉，把底座换成
 FastAPI + Elasticsearch + Vue3，数据源从关系库小批量数据换成多源开放大数据。
-原系统的完整界面快照与迁移映射见
-[`.workbuddy/legacy-preserve/original-ui/README.md`](.workbuddy/legacy-preserve/original-ui/README.md)，
-可用静态服务器打开对照（渲染脚本 `render_preview.py`，端口 8001）。
+上一代系统的代码、SQL Server 脚本与界面蓝图快照已于 2026-10-22 整体清理出仓库，
+仅保留仍在使用中的种子片库资产（`data/web_movies.json` 等，见下方目录结构）。
 
 ---
 
@@ -137,16 +136,7 @@ movie-recommendation-system-main/
 │   ├── web_movies.json       120 部中文片库（95 部带 tmdb_id），本平台种子片库
 │   ├── chinese_title_map.py  英文片名 → 中文译名映射（ingest 在用）
 │   └── chinese_domestic_movies.py  国产片补充数据
-│
-├── movie_system_*.sql        上一代系统的 SQL Server 脚本（仅作参考，不再使用）
-├── seed_sqlserver_data.py    同上（其依赖的 data/web_movie_data.py 已移除）
-│
-└── .workbuddy/legacy-preserve/original-ui/
-                            上一代 Flask 系统的界面蓝图（阶段 5 设计参照）
-    ├── templates/ static/ models/ app.py
-    ├── render_preview.py    模板 → 静态 HTML 渲染器
-    ├── preview/             渲染产物（11 页，http.server 8001 打开）
-    └── README.md            蓝图说明 + 原功能 → 本平台迁移映射表
+└── docs/                     方案与交付文档（phase5 前端方案 / 交付说明）
 ```
 
 ---
@@ -1316,24 +1306,6 @@ ES 7+ 默认只精确统计到 1 万条，影评有 4.99 万条，`hits.total` �
 修复：中文分词保留标点 token（否定作用域在标点处截止），
 同时补掉了旧版 tokenize_zh 把中英文顺序打乱的 bug。
 英文分词不产出标点 token，所以英文指标一动不动（83.56% 复测一致）。
-
----
-
-## 上一代系统遗留物与蓝图
-
-上一代「Flask + SQL Server 电影推荐系统」已从本仓库移除（目录 `movie_system_api/`
-及配套运维脚本、备份目录均已清出），本平台在它基础上做大数据扩展——
-**原系统作蓝本，新栈承载**（yuan 2026-10-15 确认）。
-
-仍然保留的参考材料：
-
-| 路径 | 说明 |
-|---|---|
-| `movie_system_advanced.sql`、`movie_system_sqlserver.sql` | 上一代的 SQL Server 建表与数据脚本，仅作数据模型参考 |
-| `seed_sqlserver_data.py` | 上一代的灌数脚本。**注意**：它依赖的 `data/web_movie_data.py` 已随上一代一起移除，直接跑会报 ImportError |
-| `data/web_movies.json` 等 | 已转为本平台的种子片库资产，正常使用中 |
-| `.workbuddy/legacy-preserve/original-ui/` | **上一代界面蓝图**（git 提交 `9723066` 提取）：11 页模板 + `render_preview.py` 渲染器 + 静态预览（`http.server 8001`）+ 原功能→本平台迁移映射表。阶段 5 前端设计对照用，详见其中的 README.md |
-| `docs/phase5-frontend-plan.md` | 阶段 5 前端方案（信息架构 / 目录 / 接口映射 / 分步计划），实现前先确认 |
 
 ---
 
