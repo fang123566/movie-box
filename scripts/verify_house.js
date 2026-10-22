@@ -61,7 +61,7 @@ function check(name, ok, extra = '') {
   })
   check('大厅渲染满屏', house.w > 1200 && house.h > 500, `${house.w}×${house.h}`)
   check('六扇门', house.doors === 6, `${house.doors} 扇 / 宽 ${house.doorW}px`)
-  check('门牌齐全', house.plates.join('/') === '口碑星图/类型竞赛/口碑排名/年代流向/口碑分歧/取景地图', house.plates.join('/'))
+  check('门牌齐全', house.plates.join('/') === '口碑星图/票房分析/口碑排名/年代流向/口碑分歧/取景地图', house.plates.join('/'))
   check('砖墙 SVG 在位', house.wall)
   check('招牌文案', house.sign === '影评洞察馆', house.sign)
   check('大厅模式收起 HUD 图表区', house.hudHidden)
@@ -308,7 +308,7 @@ function check(name, ok, extra = '') {
      不再每间房都摆同一套"回声廊+叙事轴"，而是按门主题取各自专属面板。 */
   const PANEL_OK = {
     galaxy:  ['跨文化回声廊', '叙事时间轴'],
-    race:    ['类型口碑榜', '高频词云'],
+    box:     ['全球票房榜', '年度票房'],
     rank:    ['豆瓣口碑', '类型口碑榜'],
     flow:    ['叙事时间轴', '预告覆盖'],
     diverge: ['豆瓣口碑', '跨文化回声廊'],
@@ -330,6 +330,74 @@ function check(name, ok, extra = '') {
     check(`展厅[${key}] 标签精简为该房专属`, p.ltabs.length === 1 && p.rtabs.length === 1, `左 ${p.ltabs.length} / 右 ${p.rtabs.length}`)
   }
 
+  /* ---------- 票房分析展厅：itomdev 式相框绳画廊（2026-10-22 新增） ---------- */
+  await page.goto(BASE + '/screen?room=box', { waitUntil: 'networkidle2', timeout: 60000 })
+  await page.waitForSelector('.room-nav', { timeout: 20000 })
+  await page.waitForSelector('.bog__frame', { timeout: 20000 })
+  await sleep(1600)
+  const bog = await page.evaluate(() => ({
+    frames: document.querySelectorAll('.bog__frame').length,
+    pins: document.querySelectorAll('.bog__pin').length,
+    line: !!document.querySelector('.bog__line'),
+    posters: [...document.querySelectorAll('.bog__mat img')].filter((i) => i.complete && i.naturalWidth > 0).length,
+    caps: [...document.querySelectorAll('.bog__cap')].map((e) => e.textContent.trim()).slice(0, 3),
+    summary: (document.querySelector('.bog__summary') || {}).textContent,
+    rankRows: document.querySelectorAll('.borank__row').length,
+    trendCanvas: (() => { const c = document.querySelector('.botrend__chart canvas'); return c ? c.width : 0 })(),
+  }))
+  check('票房画廊相框上架', bog.frames === 24 && bog.pins === 24 && bog.line, `frames=${bog.frames} pins=${bog.pins}`)
+  check('相框海报加载', bog.posters >= 20, `posters=${bog.posters}/24`)
+  check('相框 caption 为真实片名', bog.caps.length === 3 && bog.caps[0].length >= 2, JSON.stringify(bog.caps))
+  check('总览条有样本数', /票房样本/.test(bog.summary || ''), (bog.summary || '').slice(0, 40))
+  check('左翼票房榜十行', bog.rankRows === 10, `rows=${bog.rankRows}`)
+  check('右翼年度趋势图渲染', bog.trendCanvas > 100, `canvas=${bog.trendCanvas}`)
+
+  // 点相框 → 详情纸卡（票房/预算/ROI 四格）
+  const framePt = await page.evaluate(() => {
+    const r = document.querySelectorAll('.bog__frame')[2].getBoundingClientRect()
+    return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }
+  })
+  await page.mouse.click(framePt.x, framePt.y)
+  await sleep(900)
+  const card = await page.evaluate(() => {
+    const p = document.querySelector('.bog-card__paper')
+    if (!p) return { open: false }
+    return {
+      open: true,
+      title: (p.querySelector('.bog-card__title') || {}).textContent,
+      cells: [...p.querySelectorAll('.bog-card__cell')].map((c) => (c.querySelector('b') || {}).textContent),
+      link: !!p.querySelector('.bog-card__link'),
+    }
+  })
+  check('点相帧弹档案纸卡', card.open && card.cells.length === 4, JSON.stringify(card))
+  check('档案卡票房数字真实', card.cells && card.cells[0] && /亿美元/.test(card.cells[0]), card.cells && card.cells[0])
+  check('档案卡带影片链接', card.link)
+  await page.screenshot({ path: `${OUT}/screen-box-gallery.png` })
+  await page.keyboard.press('Escape')
+  await sleep(500)
+  const cardClosed = await page.evaluate(() => !document.querySelector('.bog-card__paper'))
+  check('Esc 关闭档案卡', cardClosed)
+
+  // 滚轮沿线漂移（桌面端）
+  const drift = await page.evaluate(() => {
+    const rail = document.querySelector('.bog__rail')
+    return { t: getComputedStyle(rail).transform }
+  })
+  await page.mouse.move(700, 500)
+  await page.mouse.wheel({ deltaY: 500 })
+  await sleep(700)
+  const drift2 = await page.evaluate(() => ({ t: getComputedStyle(document.querySelector('.bog__rail')).transform }))
+  check('滚轮沿绳漂移', drift.t !== drift2.t, `${drift.t.slice(0, 24)} → ${drift2.t.slice(0, 24)}`)
+
+  // 左翼榜单点选 → 中央画廊打开同一部档案（联动）
+  await page.evaluate(() => document.querySelectorAll('.borank__row')[1].click())
+  await sleep(900)
+  const pickCard = await page.evaluate(() => {
+    const p = document.querySelector('.bog-card__paper')
+    return { open: !!p, title: p ? (p.querySelector('.bog-card__title') || {}).textContent : null }
+  })
+  check('票房榜点选联动画廊档案', pickCard.open && !!pickCard.title, JSON.stringify(pickCard))
+
   /* ---------- 键盘可达性 ---------- */
   await page.evaluate(() => document.querySelector('.room-nav__back').click())
   await sleep(900)
@@ -342,7 +410,7 @@ function check(name, ok, extra = '') {
   await sleep(1200)
   const kbRoom = await page.evaluate(() => (document.querySelector('.room-nav__plate b') || {}).textContent)
   check('门可聚焦', kb)
-  check('回车推门进展厅', kbRoom === '类型竞赛', kbRoom)
+  check('回车推门进展厅', kbRoom === '票房分析', kbRoom)
 
   /* ---------- 桌面无横向溢出 ---------- */
   const ovf = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)

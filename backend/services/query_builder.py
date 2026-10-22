@@ -535,6 +535,42 @@ def build_genre_decade_matrix(genre_size: int = 10) -> dict:
 
 
 # ============================================================
+# 票房分析（2026-10-22）：年度票房趋势聚合
+# ============================================================
+
+def build_box_office_years() -> dict:
+    """年度票房趋势：按 release_year 分桶合计票房（仅统计有票房的影片）。
+
+    设计说明：
+    · 用 terms + order _key 而不是 histogram —— release_year 是整数字段，
+      histogram 的 interval 语义对"年份"是巧合可用但对齐口径容易歧义；
+      terms 直接给真实年份键，order 升序后前端省一道排序。
+    · size=200 足够覆盖片库年份跨度（1938~2026）；
+      超出部分会被 ES 静默丢弃，故调用方按桶数复核对。
+    · total_rev 是全局票房合计（独立于分桶），用于总览数字；
+      与各桶相加的差异 = 缺年份影片的票房，如实体现在接口 note 里。
+    """
+    return {
+        "size": 0,
+        "track_total_hits": True,
+        "query": {"bool": {"filter": [{"exists": {"field": "revenue"}}]}},
+        "aggs": {
+            "by_year": {
+                "terms": {
+                    "field": "release_year",
+                    "size": 200,
+                    "order": {"_key": "asc"},
+                },
+                "aggs": {
+                    "rev": {"sum": {"field": "revenue"}},
+                },
+            },
+            "total_rev": {"sum": {"field": "revenue"}},
+        },
+    }
+
+
+# ============================================================
 # 趣味功能（阶段 5 前功能补全）：盲盒 / 足迹地图
 # ============================================================
 

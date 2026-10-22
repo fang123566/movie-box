@@ -45,6 +45,9 @@ CORE_FIELDS: tuple[str, ...] = (
     "vote_average",     # 平均分（10 分制，各源统一到同一量纲）
     "vote_count",       # 评分人数
     "popularity",       # 热度
+    # ---- 票房与预算（票房分析展厅用；TMDB 单位为美元，缺为 None）----
+    "revenue",          # 全球票房（美元）
+    "budget",           # 制作预算（美元）
     # ---- 地域与语言（足迹地图要用）----
     "original_language",
     "spoken_languages",

@@ -79,7 +79,14 @@
         <div v-show="view !== 'galaxy'" class="stage-panel">
           <div class="stage-panel__inner">
             <Transition name="stage-fade" mode="out-in">
-              <BarChartRace v-if="view === 'race'" :matrix="matrix" />
+              <BoxOfficeGallery
+                v-if="view === 'box'"
+                :gallery="boxOffice?.gallery || []"
+                :total-movies="boxOffice?.total_movies || 0"
+                :total-revenue="boxOffice?.total_revenue || 0"
+                :top-year="boxOffice?.top_year"
+                :pick="boxPick"
+              />
               <BumpChart v-else-if="view === 'rank'" :matrix="matrix" />
               <SankeyFlow v-else-if="view === 'flow'" :matrix="matrix" />
               <DivergenceChart v-else-if="view === 'diverge'" :divergence="douban?.rating_divergence || []" />
@@ -119,6 +126,12 @@
               <EchoChamber v-if="leftTab === 'echo'" :sentiment="sentiment" :lexicon="lexicon" />
               <WordCloudCard v-else-if="leftTab === 'cloud'" :lexicon="lexicon" />
               <DoubanPanel v-else-if="leftTab === 'douban'" :douban="douban" />
+              <BoxOfficeRank
+                v-else-if="leftTab === 'boxrank'"
+                :gallery="boxOffice?.gallery || []"
+                :total-movies="boxOffice?.total_movies || 0"
+                @pick="boxPick = $event"
+              />
             </Transition>
           </div>
         </div>
@@ -154,6 +167,12 @@
               <StoryTimeline v-if="rightTab === 'story'" :trends="trends" />
               <GenreRankCard v-else-if="rightTab === 'rank'" :by-genre="sentiment?.by_genre || []" />
               <CoveragePanel v-else-if="rightTab === 'coverage'" :douban="douban" />
+              <BoxOfficeTrend
+                v-else-if="rightTab === 'boxtrend'"
+                :years="boxOffice?.years || []"
+                :total-revenue="boxOffice?.total_revenue || 0"
+                :total-movies="boxOffice?.total_movies || 0"
+              />
             </Transition>
           </div>
         </div>
@@ -253,12 +272,12 @@
 <script setup>
 // ============================================================
 // 影评洞察大屏 /screen（用户定调：洞察页 = 数据分析大屏本体）
-//   · 数据：sentiment / trends / matrix / lexicon / movies / reviews / mapPoints，
-//     全部真实接口（matrix = ES 类型×年代聚合，Flourish 图表数据源；
+//   · 数据：sentiment / trends / matrix / boxOffice / lexicon / movies / reviews /
+//     mapPoints，全部真实接口（matrix = ES 类型×年代聚合；boxOffice = ES 票房
+//     聚合 + TOP 影片，2026-10-22 起替代原「类型竞赛」展厅；
 //     mapPoints = /fun/map，Wikidata 拍摄地坐标，3D 地球数据源）
-//   · 视图：星图（3D 粒子，悬停可读单部影片）/ 竞赛（条形竞赛）/ 排名（口碑变化）/
-//     流向（桑基）/ 地图（3D 地球取景地），16 秒自动轮播，鼠标悬停 HUD 暂停；
-//     手动点击后重新计时
+//   · 视图：星图（3D 粒子，悬停可读单部影片）/ 票房（itomdev 式相框绳画廊）/
+//     排名（口碑变化）/ 流向（桑基）/ 分歧（豆瓣对比）/ 地图（3D 地球取景地）
 //   · 3D 层切走时只压暗不卸载：反复销毁 WebGL context 会掉显存
 //   · globe.gl 体积大：取景地图视图用 defineAsyncComponent 懒加载，进视图才下载
 // ============================================================
@@ -266,7 +285,9 @@ import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, r
 import gsap from 'gsap'
 import { api } from '../api'
 import GalaxyStage from '../components/screen/GalaxyStage.vue'
-import BarChartRace from '../components/screen/BarChartRace.vue'
+import BoxOfficeGallery from '../components/screen/BoxOfficeGallery.vue'
+import BoxOfficeRank from '../components/screen/BoxOfficeRank.vue'
+import BoxOfficeTrend from '../components/screen/BoxOfficeTrend.vue'
 import BumpChart from '../components/screen/BumpChart.vue'
 import SankeyFlow from '../components/screen/SankeyFlow.vue'
 import EchoChamber from '../components/screen/EchoChamber.vue'
@@ -289,6 +310,8 @@ const movies = ref([])
 const sentiment = ref(null)
 const trends = ref(null)
 const matrix = ref(null)
+const boxOffice = ref(null)  // 票房分析（/insights/box-office）
+const boxPick = ref(null)    // 左翼票房榜点选 → 中央画廊打开同一部档案
 const lexicon = ref(null)
 const reviews = ref([])
 const mapPoints = ref([])   // 取景地坐标（/fun/map）
@@ -321,8 +344,8 @@ const armCount = computed(() => {
 const VIEWS = [
   { key: 'galaxy', zh: '口碑星图', icon: '🌌', desc: '每颗星是一部影片，越亮越热', glow: '#3B2F63', tint: '#6D28D9',
     left: ['echo'], right: ['story'] },
-  { key: 'race', zh: '类型竞赛', icon: '🏁', desc: '类型随年代你追我赶', glow: '#8B4513', tint: '#C2410C',
-    left: ['rank'], right: ['cloud'] },
+  { key: 'box', zh: '票房分析', icon: '🎬', desc: '全球票房 TOP 挂在绳上，点框看档案', glow: '#8B4513', tint: '#C2410C',
+    left: ['boxrank'], right: ['boxtrend'] },
   { key: 'rank', zh: '口碑排名', icon: '📈', desc: '各类型口碑位次变化', glow: '#A0522D', tint: '#B45309',
     left: ['douban'], right: ['rank'] },
   { key: 'flow', zh: '年代流向', icon: '🌊', desc: '类型与年代之间的影片流向', glow: '#0F766E', tint: '#0F766E',
@@ -342,6 +365,8 @@ const panelMeta = {
   story:   { zh: '叙事时间轴',   en: '年代影片叙事',       tab: '年代故事', comp: 'StoryTimeline' },
   rank:    { zh: '类型口碑榜',   en: '各类型口碑评分',     tab: '类型口碑', comp: 'GenreRankCard' },
   coverage:{ zh: '预告覆盖',     en: '高分片预告触达',     tab: '预告覆盖', comp: 'CoveragePanel' },
+  boxrank: { zh: '全球票房榜',   en: 'TOP 10 · TMDB 口径', tab: '票房榜',   comp: 'BoxOfficeRank' },
+  boxtrend:{ zh: '年度票房',     en: '上映年合计 · 亿美元', tab: '年度趋势', comp: 'BoxOfficeTrend' },
 }
 const view = ref('galaxy')
 
@@ -487,6 +512,8 @@ onMounted(async () => {
   api.sentimentStats().then((d) => { sentiment.value = d }).catch(() => {})
   api.trends().then((d) => { trends.value = d }).catch(() => {})
   api.matrix().then((d) => { matrix.value = d }).catch(() => {})
+  // 票房分析（2026-10-22：替代原「类型竞赛」展厅）
+  api.boxOffice(24).then((d) => { boxOffice.value = d }).catch(() => {})
   api.lexicon(40).then((d) => { lexicon.value = d }).catch(() => {})
   // 取景地坐标（3D 地球数据源，Wikidata）
   api.map().then((d) => { mapPoints.value = d?.points || [] }).catch(() => {})

@@ -218,6 +218,9 @@ MOVIES_MAPPING: dict = {
         "popularity": {"type": "float"},
         "imdb_rating": {"type": "float"},
         "imdb_votes": {"type": "integer"},
+        # ---- 票房与预算（美元；票房分析展厅聚合用）----
+        "revenue": {"type": "long"},
+        "budget": {"type": "long"},
         # ---- 阶段 1f：豆瓣评分（解除「禁采集豆瓣」红线后新增）----
         "douban_id": _kw(),
         "douban_rating": {"type": "float"},

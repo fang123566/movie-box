@@ -115,6 +115,9 @@ def normalize_movie(raw: dict, genre_map: dict[int, str] | None = None) -> dict:
         "vote_average": round(float(raw.get("vote_average") or 0), 1),
         "vote_count": int(raw.get("vote_count") or 0),
         "popularity": round(float(raw.get("popularity") or 0), 2),
+        # 票房与预算（美元）；TMDB 详情接口原样给出，缺或 0 归一为 None
+        "revenue": int(raw["revenue"]) if (raw.get("revenue") or 0) > 0 else None,
+        "budget": int(raw["budget"]) if (raw.get("budget") or 0) > 0 else None,
         "original_language": raw.get("original_language"),
         "spoken_languages": [_clean(l.get("name")) for l in raw.get("spoken_languages") or []],
         "production_countries": [_clean(c.get("name")) for c in raw.get("production_countries") or []],

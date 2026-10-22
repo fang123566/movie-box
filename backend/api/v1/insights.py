@@ -9,6 +9,7 @@
 | `GET  /api/v1/insights/lexicon` | 学出来的情感词典本身（答辩演示用） |
 | `GET  /api/v1/insights/trends` | 年代趋势：每十年影片数与均分（折线图） |
 | `GET  /api/v1/insights/matrix` | 类型×年代矩阵：大屏动态图表（竞赛/排名/流向）数据源 |
+| `GET  /api/v1/insights/box-office` | 票房分析：TOP 影片画廊 + 年度票房趋势 |
 | `GET  /api/v1/insights/movies/{id}` | 单片画像：关键词 + 类型口碑参考 |
 
 ★ 这些接口的数据从哪来？
@@ -28,6 +29,9 @@ from fastapi import APIRouter, HTTPException, Query
 from backend.api.v1.errors import es_unavailable as _guard
 from backend.schemas.insights import (
     GenreRating,
+    BoxOfficeItem,
+    BoxOfficeResponse,
+    BoxOfficeYearBucket,
     KeywordItem,
     MatrixCell,
     MatrixResponse,
@@ -43,7 +47,11 @@ from backend.schemas.insights import (
     TrendsResponse,
     WordHit,
 )
-from backend.services.query_builder import build_decade_aggs, build_genre_decade_matrix
+from backend.services.query_builder import (
+    build_box_office_years,
+    build_decade_aggs,
+    build_genre_decade_matrix,
+)
 from backend.services.search_service import SearchUnavailable, get_movie
 from common.es_client import get_es
 from common.settings import settings
@@ -298,6 +306,111 @@ async def genre_decade_matrix() -> MatrixResponse:
 
     try:
         return await cache.get_or_set("insights:matrix", _produce)
+    except SearchUnavailable as exc:
+        raise es_unavailable(exc) from exc
+
+
+# ============================================================
+# 票房分析（2026-10-22 新增展厅，替代原「类型竞赛」）
+# ============================================================
+
+
+@router.get("/box-office", response_model=BoxOfficeResponse, summary="票房分析（画廊相框 + 年度趋势）")
+async def box_office(
+    top: int = Query(default=24, ge=6, le=60, description="画廊相框取票房前多少部"),
+) -> BoxOfficeResponse:
+    """票房分析展厅数据源：TOP 影片画廊（相框）+ 年度票房趋势（右翼图）。
+
+    数据口径：仅统计 TMDB 给出 revenue 的影片（当前库约 242 部）。
+    roi = revenue / budget —— 缺预算的老片留 None，不编数。
+    ★ 缓存：与 matrix 同性质的 ES 聚合，进 TTL 缓存（默认 5 分钟）。
+    """
+    async def _produce() -> BoxOfficeResponse:
+        es = get_es().options(request_timeout=15)
+        # 1) 票房 TOP N：画廊相框内容
+        try:
+            top_resp = await es.search(
+                index=settings.es_index_movies,
+                size=top,
+                track_total_hits=True,
+                query={"bool": {"filter": [{"exists": {"field": "revenue"}}]}},
+                sort=[{"revenue": "desc"}],
+                _source=[
+                    "title", "title_zh", "title_en", "release_year",
+                    "poster_url", "revenue", "budget", "vote_average", "genres_zh",
+                ],
+            )
+        except Exception as exc:  # noqa: BLE001
+            raise _guard(SearchUnavailable(f"{type(exc).__name__}: {exc}")) from exc
+
+        gallery: list[BoxOfficeItem] = []
+        for hit in top_resp.get("hits", {}).get("hits", []):
+            s = hit["_source"]
+            revenue = int(s.get("revenue") or 0)
+            budget = int(s["budget"]) if s.get("budget") else None
+            roi = round(revenue / budget, 2) if budget else None
+            gallery.append(BoxOfficeItem(
+                movie_id=str(hit["_id"]),
+                title=str(s.get("title_zh") or s.get("title") or ""),
+                title_en=s.get("title_en"),
+                year=s.get("release_year"),
+                poster_url=s.get("poster_url"),
+                revenue=revenue,
+                budget=budget,
+                roi=roi,
+                vote_average=s.get("vote_average"),
+                genres=list(s.get("genres_zh") or []),
+            ))
+
+        # 2) 年度票房趋势 + 总览（聚合构造在 query_builder，纯函数可离线自检）
+        try:
+            agg_resp = await es.search(
+                index=settings.es_index_movies,
+                **build_box_office_years(),
+            )
+        except Exception as exc:  # noqa: BLE001
+            raise _guard(SearchUnavailable(f"{type(exc).__name__}: {exc}")) from exc
+
+        aggs = agg_resp.get("aggregations", {})
+        years: list[BoxOfficeYearBucket] = []
+        for b in aggs.get("by_year", {}).get("buckets", []):
+            key = b.get("key")
+            if key is None or key == "":  # 缺年份的影片进 null 键桶，趋势图不画
+                continue
+            years.append(BoxOfficeYearBucket(
+                year=int(key),
+                revenue=int(b.get("rev", {}).get("value") or 0),
+                movies=int(b.get("doc_count") or 0),
+            ))
+        years.sort(key=lambda y: y.year)
+
+        total_movies = int(
+            agg_resp.get("hits", {}).get("total", {}).get("value")
+            or top_resp.get("hits", {}).get("total", {}).get("value")
+            or 0
+        )
+        total_revenue = int(aggs.get("total_rev", {}).get("value") or 0)
+        top_year = max(years, key=lambda y: y.revenue).year if years else None
+
+        # 桶合计 vs 全局合计的差额 = 缺年份影片的票房，如实写进 note
+        bucketed = sum(y.revenue for y in years)
+        note = None
+        if total_revenue and bucketed < total_revenue:
+            no_year = total_revenue - bucketed
+            note = (f"有 {no_year / 1e8:.2f} 亿美元票房来自缺年份字段的影片，"
+                    f"未计入年度趋势图")
+
+        return BoxOfficeResponse(
+            total_movies=total_movies,
+            total_revenue=total_revenue,
+            top_year=top_year,
+            gallery=gallery,
+            years=years,
+            note=note,
+        )
+
+    try:
+        return await cache.get_or_set("insights:box-office", _produce)
     except SearchUnavailable as exc:
         raise es_unavailable(exc) from exc
 

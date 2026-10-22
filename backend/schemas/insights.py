@@ -175,3 +175,51 @@ class MatrixResponse(BaseModel):
     decades: list[int] = Field(default_factory=list)
     rows: list[MatrixRow] = Field(default_factory=list)
     note: str | None = None
+
+
+# ============================================================
+# 票房分析（2026-10-22 新增，替代原「类型竞赛」展厅）
+# ============================================================
+
+
+class BoxOfficeItem(BaseModel):
+    """票房画廊里的一部影片：相框内容 + 详情纸卡用的全部数字。
+
+    revenue/budget 单位美元（TMDB 口径）；roi = revenue / budget，
+    缺预算时为 None —— 老片普遍没有预算数据，如实留空不编。
+    """
+
+    movie_id: str
+    title: str
+    title_en: str | None = None
+    year: int | None = None
+    poster_url: str | None = None
+    revenue: int
+    budget: int | None = None
+    roi: float | None = None
+    vote_average: float | None = None
+    genres: list[str] = Field(default_factory=list)
+
+
+class BoxOfficeYearBucket(BaseModel):
+    """年度票房桶：某年上映影片的票房合计（仅统计有票房数据的影片）。"""
+
+    year: int
+    revenue: int = 0
+    movies: int = 0
+
+
+class BoxOfficeResponse(BaseModel):
+    """票房分析展厅数据源：画廊相框 + 年度趋势 + 总览数字。
+
+    gallery 按票房倒序取前 N 部（相框沿晾衣绳排开）；
+    years 按年份升序（右翼趋势图）。total_movies 是**有票房数据**的影片数，
+    远小于片库总数 —— TMDB 只对部分影片给出 revenue，如实报数。
+    """
+
+    total_movies: int = 0
+    total_revenue: int = 0
+    top_year: int | None = None
+    gallery: list[BoxOfficeItem] = Field(default_factory=list)
+    years: list[BoxOfficeYearBucket] = Field(default_factory=list)
+    note: str | None = None

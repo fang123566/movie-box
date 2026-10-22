@@ -98,6 +98,9 @@ SCALAR_PRIORITY: dict[str, tuple[str, ...]] = {
     "vote_average":      ("tmdb", "imdb", "legacy", "wikidata"),
     "vote_count":        ("tmdb", "imdb", "legacy", "wikidata"),
     "popularity":        ("tmdb", "imdb", "legacy", "wikidata"),
+    # 票房与预算：仅 TMDB 有（美元），票房分析展厅的数据源
+    "revenue":           ("tmdb",),
+    "budget":            ("tmdb",),
     # 人物：老片库的导演是人工录的，比机器抽的准
     "director":          ("legacy", "tmdb", "wikidata", "imdb"),
     # 地域与语言
@@ -382,6 +385,9 @@ def finalize(bucket: dict, *, collected_at: str | None = None) -> dict:
     rec["release_year"] = to_int(rec.get("release_year"))
     rec["runtime"] = to_int(rec.get("runtime"))
     rec["vote_count"] = to_int(rec.get("vote_count"))
+    # 票房/预算：美元整额；0/缺失归一 None（ES 里不参与聚合）
+    rec["revenue"] = to_int(rec.get("revenue")) or None
+    rec["budget"] = to_int(rec.get("budget")) or None
     va = to_float(rec.get("vote_average"))
     rec["vote_average"] = round(va, 1) if va else None
     pop = to_float(rec.get("popularity"))

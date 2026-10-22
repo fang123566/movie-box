@@ -117,6 +117,7 @@ export const api = {
   sentimentStats: () => request('/insights/sentiment'),
   trends: () => request('/insights/trends'),
   matrix: () => request('/insights/matrix'),
+  boxOffice: (top = 24) => request(`/insights/box-office${qs({ top })}`),
   topics: (top = 30) => request(`/insights/topics${qs({ top })}`),
   lexicon: (top = 20) => request(`/insights/lexicon${qs({ top })}`),
   movieInsight: (id) => request(`/insights/movies/${encodeURIComponent(id)}`),
