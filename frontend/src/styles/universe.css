@@ -1,0 +1,968 @@
+/* ============================================================
+   电影盒子 · 深空电影宇宙大屏（全屏 HUD）
+   ------------------------------------------------------------
+   设计约束（硬性）：
+     1. 一屏 16:9 展示完毕 —— 100vw × 100vh，全局 overflow:hidden，
+        绝不出现上下/左右滚动条；
+     2. 结构 = 底层 3D 画布（z-index:0） + 上层悬浮 HUD（z-index:10），
+        HUD 层 pointer-events:none（鼠标可穿透去拖拽背后的星云），
+        仅面板与按钮 pointer-events:auto；
+     3. 三区五块绝对定位：顶部状态栏 / 左面板 / 右面板 / 底部数据流带
+        （+ 中央悬浮提示条），不使用 flex 纵向排列；
+     4. 玻璃拟态：深蓝玻璃 + blur + 彩色渐变边 + 切角；
+     5. 字体：数字/英文 Orbitron，正文思源黑体。
+
+   ★ 2026-10-19 视觉方向（用户两次反馈"不要全是深颜色" + 参照
+     knight-L/sc-datav）：深空底保留，但整体**提亮增彩**——
+     · 背景从近黑改为彩色星云（蓝/紫/金三段辉光），不再是"一片死黑"；
+     · 面板玻璃更亮、边框改金→青渐变并带流动光；
+     · 强调色从"金+蓝"双色扩为五色：暖金 / 暖橙(sc-datav 同款
+       #FF9100/#EA580C) / 青 / 天蓝 / 紫，图表与标签全部彩色化；
+     · 动效全面对齐 sc-datav：角标 hover 展开、SVG mask 扫光、
+       GSAP 方向性错峰入场、CatmullRom 流星粒子、星星闪烁、扫描线。
+   ============================================================ */
+
+/* ---------- 令牌 ---------- */
+/* 2026-10-19 浅色化（用户："整个这个页面还是改成浅色的"）：
+   深空宇宙 → 暖白纸感。底色暖米白、文字深咖、强调色整体加深一档
+   （原 #FF9100 亮橙在白底对比不足），保留 HUD 切角/渐变边/扫光结构 */
+:root {
+  --u-void: #F6F1E6;          /* 暖白纸（替代深空基色） */
+  --u-deep: #EEE6D6;          /* 暖米外围 */
+  --u-glass: rgba(255, 253, 247, 0.78);
+  --u-glass-strong: rgba(255, 253, 247, 0.92);
+  --u-line: rgba(154, 96, 40, 0.22);
+  --u-line-strong: rgba(154, 96, 40, 0.55);
+  --u-gold: #A67C2E;
+  --u-orange: #C2410C;        /* 白底可读的深橙（原 #FF9100 对比不足） */
+  --u-orange-deep: #9A3412;
+  --u-cyan: #0F766E;
+  --u-sky: #0369A1;
+  --u-violet: #6D28D9;
+  --u-blue: #4A7FB5;
+  --u-text: #3A2E20;          /* 深咖正文 */
+  --u-text-2: #7D6B52;        /* 中咖次要 */
+  /* 彩色渐变边（面板/标题通用）：金 → 橙 → 青（浅色版降饱和） */
+  --u-border-grad: linear-gradient(120deg, rgba(166,124,46,.5), rgba(194,65,12,.42) 45%, rgba(15,118,110,.38));
+  --u-cut: 14px;              /* 切角尺寸 */
+  /* 切角多边形：左上 + 右下 斜切（HUD 面板） */
+  --u-poly: polygon(
+    var(--u-cut) 0,
+    100% 0,
+    100% calc(100% - var(--u-cut)),
+    calc(100% - var(--u-cut)) 100%,
+    0 100%,
+    0 var(--u-cut)
+  );
+  --u-font-tech: 'Orbitron', 'DIN Alternate', 'Bahnschrift', 'Rajdhani', sans-serif;
+  --u-font-cn: 'Source Han Sans SC', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+/* ---------- 全局锁滚动（仅本页挂载时给 body 加 .u-body-lock） ---------- */
+html.u-body-lock,
+body.u-body-lock {
+  overflow: hidden !important;
+  height: 100%;
+  margin: 0;
+  background: var(--u-void);
+  /* 彻底干掉滚动条占位 */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+body.u-body-lock::-webkit-scrollbar { width: 0; height: 0; display: none; }
+
+/* 锁滚动时把外层壳也压成一屏（.app-shell 原本 min-height:100vh + flex 列，
+   大屏页 100vh 会与之叠加成 200vh；虽然被 overflow 裁掉，仍会让布局计算失真） */
+body.u-body-lock .app-shell {
+  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
+}
+body.u-body-lock .app-main {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+}
+body.u-body-lock .app-main > * { flex: 1; min-height: 0; }
+
+/* ============================================================
+   1. 容器：一屏到底
+   ------------------------------------------------------------
+   宽高不再写死 100vw/100vh：站点导航栏（--header-h 60px）常驻后，
+   本容器是 .app-main（body-lock 下 flex:1，高度 = 100vh - 导航）
+   里唯一的子元素，100% 撑满即是"扣除导航后的一屏"。
+   ============================================================ */
+.dashboard-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  /* 暖白纸底：四段淡彩辉光（暖金 / 青 / 紫 / 金）像水彩晕染，
+     不再是"一片死黑"—— 用户 2026-10-19：整个页面改成浅色的 */
+  background:
+    radial-gradient(46% 34% at 22% 18%, rgba(194, 65, 12, 0.07), transparent 70%),
+    radial-gradient(42% 36% at 80% 24%, rgba(3, 105, 161, 0.06), transparent 70%),
+    radial-gradient(52% 42% at 58% 74%, rgba(109, 40, 217, 0.05), transparent 70%),
+    radial-gradient(38% 30% at 86% 84%, rgba(166, 124, 46, 0.07), transparent 70%),
+    radial-gradient(120% 90% at 50% 42%, #FBF8F1 0%, #F3EDE0 46%, #EDE4D2 100%);
+  color: var(--u-text);
+  font-family: var(--u-font-cn);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+/* 底层星尘（纯 CSS，不占 JS；3D 画布就绪后会被 canvas 覆盖）。
+   浅色版：白点改淡咖微点（否则白纸上白点不可见） */
+.dashboard-container::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(1.4px 1.4px at 12% 22%, rgba(122, 92, 48, 0.34), transparent 100%),
+    radial-gradient(1.2px 1.2px at 78% 16%, rgba(166, 124, 46, 0.34), transparent 100%),
+    radial-gradient(1px 1px at 34% 74%, rgba(122, 92, 48, 0.26), transparent 100%),
+    radial-gradient(1.6px 1.6px at 62% 58%, rgba(15, 118, 110, 0.3), transparent 100%),
+    radial-gradient(1px 1px at 88% 82%, rgba(122, 92, 48, 0.22), transparent 100%),
+    radial-gradient(1px 1px at 22% 46%, rgba(122, 92, 48, 0.2), transparent 100%),
+    radial-gradient(1.2px 1.2px at 48% 88%, rgba(194, 65, 12, 0.26), transparent 100%);
+  opacity: 0.75;
+  /* 星星闪烁（错峰 delay，避免整片一起呼吸像灯坏） */
+  animation: u-twinkle 5.5s ease-in-out infinite;
+}
+@keyframes u-twinkle {
+  0%, 100% { opacity: 0.75; }
+  50% { opacity: 0.4; }
+}
+
+/* ============================================================
+   2. 底层 3D 画布
+   ============================================================ */
+.three-canvas-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  /* 3D 场景要能接鼠标：底层自身接收事件 */
+  pointer-events: auto;
+  cursor: grab;
+}
+.three-canvas-layer:active { cursor: grabbing; }
+/* canvas 需抬到深空背板（z-index:0）之上：position:relative 才参与层叠 */
+.three-canvas-layer canvas { display: block; width: 100%; height: 100%; position: relative; z-index: 1; }
+
+/* 深空背板（用户 2026-10-19："星图看不清楚了，加一个背景保证正常显示"）：
+   整页浅色化后 renderer 透明，粒子直接被暖白底洗没。这里在画布下方垫一块
+   椭圆深空盘（星系本是盘形）——中心浓、边缘羽化融入页面，不抢主视觉。
+   z-index：背板 0 / canvas 1（canvas 需 position:relative 才能压过背板） */
+.galaxy-bg {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(62%, 900px);
+  height: 72%;
+  border-radius: 50%;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    /* 盘内细星点（白点在深底上才显） */
+    radial-gradient(1.2px 1.2px at 18% 24%, rgba(255, 255, 255, 0.55), transparent 100%),
+    radial-gradient(1px 1px at 72% 18%, rgba(255, 255, 255, 0.45), transparent 100%),
+    radial-gradient(1.4px 1.4px at 44% 66%, rgba(255, 255, 255, 0.4), transparent 100%),
+    radial-gradient(1px 1px at 84% 62%, rgba(255, 255, 255, 0.5), transparent 100%),
+    radial-gradient(1.2px 1.2px at 30% 78%, rgba(255, 255, 255, 0.35), transparent 100%),
+    radial-gradient(1px 1px at 60% 36%, rgba(255, 255, 255, 0.4), transparent 100%),
+    radial-gradient(1px 1px at 88% 34%, rgba(255, 255, 255, 0.35), transparent 100%),
+    radial-gradient(1.3px 1.3px at 12% 52%, rgba(255, 255, 255, 0.3), transparent 100%),
+    /* 深空盘：中心浓、边缘羽化 */
+    radial-gradient(ellipse at 50% 50%,
+      rgba(22, 32, 60, 0.96) 0%,
+      rgba(20, 29, 55, 0.93) 42%,
+      rgba(18, 26, 50, 0.8) 62%,
+      rgba(16, 24, 46, 0.46) 78%,
+      rgba(16, 24, 46, 0) 92%);
+  box-shadow: inset 0 0 90px rgba(74, 127, 181, 0.16);
+}
+/* 一圈极淡的金色观测环：暗示"这是一块夜空取景框"，而非贴上去的圆纸片 */
+.galaxy-bg::after {
+  content: '';
+  position: absolute;
+  inset: 5%;
+  border-radius: 50%;
+  border: 1px solid rgba(201, 169, 110, 0.14);
+}
+
+/* 3D 就绪前的占位视觉：中央核心辉光 + 地平线 */
+.canvas-placeholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+.canvas-placeholder__core {
+  width: min(46vw, 620px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%,
+      rgba(201, 169, 110, 0.20) 0%,
+      rgba(201, 169, 110, 0.09) 26%,
+      rgba(74, 127, 181, 0.06) 48%,
+      transparent 68%);
+  filter: blur(6px);
+  animation: u-core-breathe 7s ease-in-out infinite;
+}
+@keyframes u-core-breathe {
+  0%, 100% { transform: scale(1); opacity: 0.85; }
+  50% { transform: scale(1.06); opacity: 1; }
+}
+.canvas-placeholder__tag {
+  position: absolute;
+  bottom: 22%;
+  font-family: var(--u-font-tech);
+  font-size: 11px;
+  letter-spacing: 3px;
+  color: rgba(125, 107, 82, 0.85);
+  text-transform: uppercase;
+}
+
+/* ============================================================
+   3. 上层 HUD
+   ============================================================ */
+.hud-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;   /* 默认穿透，让鼠标去操作底层 3D */
+}
+/* 只有真正需要交互的元素恢复命中 */
+.hud-layer .top-bar,
+.hud-layer .left-panel,
+.hud-layer .right-panel,
+.hud-layer .bottom-bar,
+.hud-layer .center-hud,
+.hud-layer button,
+.hud-layer a,
+.hud-layer .is-interactive {
+  pointer-events: auto;
+}
+
+/* ---------- 通用玻璃面板（切角 + 彩色渐变边 + 内发光 + 扫光） ---------- */
+/* 浅色版（用户 2026-10-19"整个页面改成浅色的"）：暖白纸玻璃 + blur，
+   1px 金→橙→青渐变边保留，内发光改暖橙低透。clip-path 会裁掉斜切边的 border，
+   由四角渐变角标补足 HUD 质感。 */
+.hud-panel {
+  position: relative;
+  background: var(--u-glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid transparent;
+  border-image: var(--u-border-grad) 1;
+  clip-path: var(--u-poly);
+  box-shadow:
+    inset 0 0 34px rgba(194, 65, 12, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+.hud-panel__body {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+/* sc-datav 同款角标：默认只露左上/右下两只小角，hover 时展开罩住整框
+   （transition width/height 100% + 半透明，比"常驻粗边框"更灵动） */
+.hud-panel__body::before,
+.hud-panel__body::after {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+  transition: width .45s ease, height .45s ease, opacity .45s ease;
+  z-index: 3;
+}
+.hud-panel__body::before {
+  left: 8px; top: 8px;
+  border-top: 2px solid var(--u-orange);
+  border-left: 2px solid var(--u-orange);
+}
+.hud-panel__body::after {
+  right: 8px; bottom: 8px;
+  border-bottom: 2px solid var(--u-cyan);
+  border-right: 2px solid var(--u-cyan);
+}
+.hud-panel:hover .hud-panel__body::before,
+.hud-panel:hover .hud-panel__body::after {
+  width: calc(100% - 16px);
+  height: calc(100% - 16px);
+  opacity: 0.45;
+}
+/* 面板扫描光：一条斜向高光每 7s 扫过一次（sc-datav 侧边扫光的 CSS 版） */
+.hud-panel__scan {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  overflow: hidden;
+}
+.hud-panel__scan::after {
+  content: '';
+  position: absolute;
+  top: -60%;
+  bottom: -60%;
+  width: 26%;
+  left: -30%;
+  background: linear-gradient(105deg, transparent, rgba(255, 196, 120, 0.14) 45%, rgba(194, 65, 12, 0.1) 50%, transparent);
+  transform: skewX(-12deg);
+  animation: u-scan 7s ease-in-out infinite;
+}
+@keyframes u-scan {
+  0%, 62% { left: -30%; }
+  100% { left: 104%; }
+}
+
+/* ---------- 面板标题 ---------- */
+.hud-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px 10px;
+  flex: none;
+}
+.hud-title__bar {
+  width: 3px;
+  height: 14px;
+  background: linear-gradient(to bottom, var(--u-gold), rgba(201, 169, 110, 0.15));
+  box-shadow: 0 0 8px rgba(201, 169, 110, 0.6);
+}
+.hud-title__zh {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: var(--u-text);
+}
+.hud-title__en {
+  font-family: var(--u-font-tech);
+  font-size: 9.5px;
+  letter-spacing: 1.6px;
+  color: rgba(125, 107, 82, 0.9);
+  text-transform: uppercase;
+}
+.hud-title__line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(to right, var(--u-line), transparent);
+}
+
+/* ============================================================
+   4. 三区五块 · 绝对定位
+   ============================================================ */
+
+/* --- 顶部状态栏 --- */
+.top-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 0 24px;
+  background: linear-gradient(to bottom, rgba(255, 253, 247, 0.94), rgba(246, 241, 230, 0.76));
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--u-line);
+  box-shadow: 0 1px 0 rgba(194, 65, 12, 0.1), 0 8px 28px rgba(120, 90, 50, 0.12);
+}
+/* 顶栏下沿流光：金→橙→青 渐变条左右巡游（sc-datav 头部扫光的 CSS 版） */
+.top-bar::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  width: 34%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--u-orange) 30%, var(--u-gold) 50%, var(--u-cyan) 70%, transparent);
+  filter: blur(0.4px);
+  animation: u-edge-flow 6s linear infinite;
+}
+@keyframes u-edge-flow {
+  from { transform: translateX(-40%); }
+  to { transform: translateX(295%); }
+}
+.top-bar__brand { display: flex; align-items: baseline; gap: 10px; flex: none; }
+.top-bar__logo {
+  font-family: var(--u-font-tech);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  /* sc-datav 同款渐变标题字：深橙→亮橙，浅底上要够深才可读 */
+  background: linear-gradient(to bottom, #7C2D12 15%, var(--u-orange-deep) 55%, var(--u-orange) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 10px rgba(194, 65, 12, 0.15));
+}
+.top-bar__sub {
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: var(--u-text-2);
+}
+.top-bar__spacer { flex: 1; }
+.top-bar__meta {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  font-family: var(--u-font-tech);
+  font-size: 11px;
+  letter-spacing: 1.2px;
+  color: var(--u-text-2);
+}
+.top-bar__num { color: var(--u-text); font-weight: 600; }
+.top-bar__live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border: 1px solid rgba(255, 145, 0, 0.45);
+  clip-path: var(--u-poly);
+  --u-cut: 7px;
+  color: var(--u-orange-deep);
+  background: rgba(194, 65, 12, 0.08);
+}
+.top-bar__dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--u-orange);
+  box-shadow: 0 0 10px var(--u-orange);
+  animation: u-pulse 1.8s ease-in-out infinite;
+}
+@keyframes u-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.78); }
+}
+.top-bar__btn {
+  height: 28px;
+  padding: 0 14px;
+  font-family: var(--u-font-tech);
+  font-size: 11px;
+  letter-spacing: 1.4px;
+  color: var(--u-text-2);
+  background: rgba(166, 124, 46, 0.08);
+  border: 1px solid var(--u-line);
+  clip-path: var(--u-poly);
+  --u-cut: 7px;
+  cursor: pointer;
+  transition: color .2s ease, background .2s ease;
+}
+.top-bar__btn:hover { color: #FFF8EC; background: var(--u-orange-deep); }
+
+/* --- 左 / 右面板 --- */
+.left-panel,
+.right-panel {
+  position: absolute;
+  top: 80px;
+  bottom: 160px;
+  width: 340px;
+}
+.left-panel { left: 24px; }
+.right-panel { right: 24px; }
+
+/* --- 底部数据流带 --- */
+.bottom-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 140px;
+  background: linear-gradient(to top, rgba(255, 253, 247, 0.96), rgba(250, 246, 236, 0.8) 62%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-top: 1px solid var(--u-line);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+/* 底栏上沿流光（与顶栏呼应，反向巡游） */
+.bottom-bar::before {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: -1px;
+  width: 34%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--u-cyan) 30%, var(--u-orange) 55%, var(--u-gold) 70%, transparent);
+  animation: u-edge-flow-r 7s linear infinite;
+}
+@keyframes u-edge-flow-r {
+  from { transform: translateX(40%); }
+  to { transform: translateX(-295%); }
+}
+.bottom-bar__head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 24px 6px;
+  font-family: var(--u-font-tech);
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: rgba(125, 107, 82, 0.95);
+  text-transform: uppercase;
+}
+.bottom-bar__track {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  mask-image: linear-gradient(to right, transparent, #000 4%, #000 96%, transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 4%, #000 96%, transparent);
+}
+/* 横向滚动流：纯 CSS animation（JS 只在数据变化时填充内容）。
+   95s/轮：用户 2026-10-19 反馈 46s 太快读不完，放慢到约 1/2 速 */
+.stream-track {
+  display: flex;
+  gap: 14px;
+  padding-left: 24px;
+  white-space: nowrap;
+  will-change: transform;
+  animation: u-stream 95s linear infinite;
+}
+.bottom-bar:hover .stream-track { animation-play-state: paused; }
+@keyframes u-stream {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.stream-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 14px;
+  background: rgba(255, 255, 255, 0.66);
+  border: 1px solid rgba(194, 65, 12, 0.2);
+  clip-path: var(--u-poly);
+  --u-cut: 8px;
+  font-size: 12px;
+  color: #4A3C2A;
+}
+.stream-chip__tag {
+  font-family: var(--u-font-tech);
+  font-size: 9.5px;
+  letter-spacing: 1px;
+  padding: 2px 6px;
+  color: var(--u-gold);
+  background: rgba(166, 124, 46, 0.12);
+}
+/* 中文片名：比正文稍亮，给长文一个视觉锚点 */
+.stream-chip__title {
+  font-weight: 600;
+  color: var(--u-text);
+  opacity: 0.92;
+}
+/* 好评=深橙、差评=深青（浅底上原浅金/浅青不可读，各加深一档） */
+.stream-chip__tag--pos {
+  color: #9A3412;
+  background: linear-gradient(120deg, rgba(194, 65, 12, 0.14), rgba(166, 124, 46, 0.12));
+  box-shadow: 0 0 10px rgba(194, 65, 12, 0.1);
+}
+.stream-chip__tag--neg {
+  color: #0F766E;
+  background: linear-gradient(120deg, rgba(15, 118, 110, 0.12), rgba(3, 105, 161, 0.1));
+  box-shadow: 0 0 10px rgba(3, 105, 161, 0.1);
+}
+
+/* --- 中央悬浮提示条（第五块） --- */
+.center-hud {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 168px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 18px;
+  background: rgba(255, 253, 247, 0.82);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--u-line);
+  clip-path: var(--u-poly);
+  --u-cut: 10px;
+  font-family: var(--u-font-tech);
+  font-size: 10.5px;
+  letter-spacing: 1.6px;
+  color: rgba(58, 46, 32, 0.92);
+  text-transform: uppercase;
+}
+.center-hud i { width: 5px; height: 5px; border-radius: 50%; background: var(--u-gold); box-shadow: 0 0 8px var(--u-gold); }
+
+/* --- 星系读图指南（galaxy 视图常驻，占 center-hud 槽位） --- */
+.galaxy-legend {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 168px;
+  max-width: calc(100vw - 48px);
+  pointer-events: auto;
+  padding: 10px 18px 12px;
+  background: rgba(255, 253, 247, 0.86);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--u-line);
+  clip-path: var(--u-poly);
+  --u-cut: 10px;
+  text-align: center;
+}
+.galaxy-legend__head {
+  display: flex; align-items: baseline; justify-content: center; gap: 10px;
+  font-size: 12px; font-weight: 600; color: var(--u-orange-deep); letter-spacing: 1px;
+}
+.galaxy-legend__head i { font-style: normal; font-size: 10px; font-weight: 400; color: var(--u-text-2); }
+.galaxy-legend__row {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 7px 18px;
+  margin-top: 7px; font-size: 11.5px; color: #4A3C2A;
+}
+.gl-item { display: inline-flex; align-items: center; gap: 7px; }
+/* 口碑色带：与 GalaxyStage 的 COLD→MID→GOLD 三段色一致（浅底版金加深） */
+.gl-item__bar {
+  width: 46px; height: 8px; border-radius: 4px;
+  background: linear-gradient(90deg, #4A7FB5, #A78BFA 52%, #D99A3A);
+  box-shadow: 0 0 8px rgba(167, 139, 250, 0.18);
+}
+.galaxy-legend__stats {
+  margin-top: 7px; font-family: var(--u-font-tech);
+  font-size: 10px; letter-spacing: 1.2px; color: var(--u-text-2);
+}
+
+/* --- 取景地图图例（globe 视图，未选中地点时） --- */
+.globe-hud {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 168px;
+  max-width: calc(100vw - 48px);
+  pointer-events: auto;
+  display: flex; align-items: center; flex-wrap: wrap; justify-content: center; gap: 7px 16px;
+  padding: 9px 18px;
+  background: rgba(255, 253, 247, 0.86);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--u-line);
+  clip-path: var(--u-poly);
+  --u-cut: 10px;
+  font-size: 11.5px; color: #4A3C2A;
+}
+.globe-hud span { display: inline-flex; align-items: center; gap: 6px; }
+.globe-hud__dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.globe-hud__dot--film { background: #B8860B; box-shadow: 0 0 8px rgba(184, 134, 11, 0.35); }
+.globe-hud__dot--story { background: #0E7490; box-shadow: 0 0 8px rgba(14, 116, 144, 0.3); }
+.globe-hud__hint { color: var(--u-text-2); }
+
+/* --- 地点影片卡（点击地球光点后占同一槽位） --- */
+.loc-card {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 168px;
+  width: min(520px, calc(100vw - 48px));
+  pointer-events: auto;
+  padding: 12px 16px;
+  background: rgba(255, 253, 247, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--u-line-strong);
+  clip-path: var(--u-poly);
+  --u-cut: 12px;
+}
+.loc-card__head { display: flex; align-items: baseline; gap: 10px; }
+.loc-card__head b { font-size: 14px; color: var(--u-orange-deep); letter-spacing: .5px; }
+.loc-card__head span { font-size: 11px; color: var(--u-text-2); }
+.loc-card__head button {
+  margin-left: auto; background: none; border: none; cursor: pointer;
+  color: var(--u-text-2); font-size: 12px; padding: 2px 6px;
+}
+.loc-card__head button:hover { color: var(--u-text); }
+.loc-card__body { margin-top: 9px; display: flex; flex-wrap: wrap; gap: 6px; }
+.loc-card__movie {
+  font-size: 11px; color: #4A3C2A; cursor: pointer;
+  padding: 4px 11px; background: rgba(120, 90, 50, 0.06);
+  border: 1px solid var(--u-line);
+  clip-path: var(--u-poly);
+  --u-cut: 6px;
+  transition: color .2s ease, border-color .2s ease;
+}
+.loc-card__movie:hover { color: var(--u-text); border-color: var(--u-line-strong); }
+.loc-card__tip { font-size: 11px; color: var(--u-text-2); }
+
+/* ============================================================
+   5. 面板内占位骨架（下一轮替换为真实图表/3D 内容）
+   ============================================================ */
+.panel-scroll {
+  flex: 1;
+  min-height: 0;
+  padding: 4px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: hidden;      /* 面板内绝不出现滚动条：超出即省略 */
+}
+.slot {
+  flex: none;
+  border: 1px dashed rgba(166, 124, 46, 0.3);
+  background: rgba(120, 90, 50, 0.04);
+  clip-path: var(--u-poly);
+  --u-cut: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--u-font-tech);
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  color: rgba(125, 107, 82, 0.85);
+  text-transform: uppercase;
+}
+.slot--ring { height: 168px; }
+.slot--bars { height: 118px; }
+.slot--words { flex: 1; min-height: 76px; }
+.slot--step { height: 62px; }
+
+/* ============================================================
+   5. 中央图表剧场（Stage 3 · Flourish 式动态图表）
+   ------------------------------------------------------------
+   结构：stage-dock 夹在左右翼之间（left/right 避开面板），
+   顶部是视图切换 tab（星系 / 竞赛 / 排名 / 流向，常驻可见），
+   下面是一块玻璃面板，里面按视图切换 3D 星系 / 条形竞赛 /
+   口碑排名 / 桑基流向。3D 层用 opacity 压暗而非卸载 ——
+   频繁销毁重建 WebGL context 会掉显存，切换回来还要等重新编译 shader。
+
+   ★ 可读性优先（用户 2026-10-19 反馈"不要都是黑色/不要全是深颜色"）：
+     面板底 ~74% 不透明的深蓝，金→橙→青渐变边，图表在任何角度都看得清。
+   ============================================================ */
+.stage-dock {
+  position: absolute;
+  left: 388px;   /* 340 面板 + 24 边距 + 24 间隙 */
+  right: 388px;
+  top: 80px;
+  bottom: 160px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  pointer-events: none;
+}
+.stage-dock > * { pointer-events: auto; }
+
+/* 视图切换 tab */
+.stage-tabs {
+  flex: none;
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.stage-tab {
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 28px;
+  padding: 0 14px;
+  font-family: var(--u-font-tech);
+  font-size: 10.5px;
+  letter-spacing: 1.6px;
+  color: #5D4E38;
+  background: rgba(255, 253, 247, 0.84);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(194, 65, 12, 0.28);
+  clip-path: var(--u-poly);
+  --u-cut: 8px;
+  cursor: pointer;
+  transition: color .22s ease, background .22s ease, border-color .22s ease, transform .22s ease;
+}
+.stage-tab:hover {
+  color: var(--u-text);
+  border-color: var(--u-line-strong);
+  transform: translateY(-1px);
+}
+/* 激活 tab：暖金橙渐变 + 呼吸光晕（浅底版：亮块深字，光晕收敛） */
+.stage-tab.is-on {
+  color: #3A2008;
+  background: linear-gradient(120deg, #FFD9A0, #F59E0B 60%, #EA580C);
+  border-color: transparent;
+  box-shadow: 0 0 14px rgba(217, 154, 58, 0.35), 0 0 28px rgba(217, 154, 58, 0.14);
+  animation: u-tab-breathe 2.6s ease-in-out infinite;
+}
+@keyframes u-tab-breathe {
+  0%, 100% { box-shadow: 0 0 14px rgba(217, 154, 58, 0.35), 0 0 28px rgba(217, 154, 58, 0.14); }
+  50% { box-shadow: 0 0 20px rgba(217, 154, 58, 0.5), 0 0 40px rgba(217, 154, 58, 0.22); }
+}
+.stage-tab__i { font-size: 12px; }
+/* 自动轮播进度条：走完一轮 tab 自动切下一个 */
+.stage-tab__prog {
+  position: absolute;
+  left: 0; bottom: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--u-gold), var(--u-orange));
+  box-shadow: 0 0 6px rgba(255, 145, 0, 0.9);
+}
+.stage-tab.is-on .stage-tab__prog { animation: u-tab-prog 16s linear forwards; }
+@keyframes u-tab-prog { from { width: 0; } to { width: 100%; } }
+
+/* 图表玻璃面板（浅色版：暖白近实底 + 金橙青渐变边） */
+.stage-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 20px;
+  background: linear-gradient(155deg, rgba(255, 255, 255, 0.92), rgba(252, 248, 239, 0.88));
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid transparent;
+  border-image: var(--u-border-grad) 1;
+  clip-path: var(--u-poly);
+  box-shadow:
+    inset 0 0 40px rgba(194, 65, 12, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    0 18px 46px rgba(120, 90, 50, 0.14);
+}
+/* 面板内扫描光（sc-datav 侧边扫光；浅底版暖金微光） */
+.stage-panel::after {
+  content: '';
+  position: absolute;
+  top: -60%;
+  bottom: -60%;
+  width: 22%;
+  left: -28%;
+  background: linear-gradient(105deg, transparent, rgba(255, 196, 120, 0.12) 45%, rgba(194, 65, 12, 0.09) 50%, transparent);
+  transform: skewX(-12deg);
+  animation: u-scan 9s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes u-scan {
+  0%, 60% { left: -28%; }
+  100% { left: 106%; }
+}
+.stage-panel__inner { flex: 1; min-height: 0; position: relative; }
+.stage-fade-enter-active, .stage-fade-leave-active { transition: opacity .35s ease; }
+.stage-fade-enter-from, .stage-fade-leave-to { opacity: 0; }
+
+/* 3D 层在图表模式下压暗（保留渲染，不卸载；0.3 仍留星空层次） */
+.three-canvas-layer { transition: opacity .5s ease; }
+.three-canvas-layer.is-dim { opacity: 0.3; }
+
+/* 左右面板内的小切换 tab（回声室 ↔ 词云 / 时间轴 ↔ 口碑榜） */
+.panel-tabs {
+  flex: none;
+  display: flex;
+  gap: 4px;
+  padding: 0 16px 10px;
+}
+.panel-tab {
+  flex: 1;
+  height: 24px;
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: #6B5B42;
+  background: rgba(120, 90, 50, 0.06);
+  border: 1px solid rgba(194, 65, 12, 0.24);
+  clip-path: var(--u-poly);
+  --u-cut: 6px;
+  cursor: pointer;
+  transition: color .2s ease, background .2s ease;
+}
+.panel-tab:hover { color: var(--u-text); }
+.panel-tab.is-on {
+  color: var(--u-orange-deep);
+  background: linear-gradient(120deg, rgba(194, 65, 12, 0.12), rgba(166, 124, 46, 0.1));
+  border-color: rgba(194, 65, 12, 0.5);
+  box-shadow: 0 0 12px rgba(194, 65, 12, 0.1);
+}
+
+/* ============================================================
+   6. 自适应：窄屏收缩两翼，中央 3D 始终留出
+   ============================================================ */
+@media (max-width: 1440px) {
+  .left-panel, .right-panel { width: 300px; }
+  .top-bar__meta { gap: 12px; font-size: 10px; }
+  .stage-dock { left: 348px; right: 348px; }
+}
+@media (max-width: 1180px) {
+  .left-panel, .right-panel { width: 264px; }
+  .top-bar__sub { display: none; }
+  .stage-dock { left: 312px; right: 312px; }
+}
+@media (max-width: 900px) {
+  /* 极窄屏：两侧面板收起（大屏本为 16:9 桌面场景），背景 3D 星图作主视觉 */
+  .left-panel, .right-panel { display: none; }
+  /* 保留顶部导航条（含「回大厅」按钮），仅隐藏中央图表剧场（无横向空间摆图表）；
+     这样窄屏/移动端进展厅后仍有返回入口，不会被整条 .stage-dock 收起而消失 */
+  .stage-dock { left: 0; right: 0; top: 72px; bottom: auto; height: auto; }
+  .stage-dock .stage-panel { display: none; }
+  /* 读图指南 / 地图图例 / 地点卡随剧场一起隐退，避免压面板 */
+  .galaxy-legend, .globe-hud, .loc-card { display: none; }
+}
+
+/* ============================================================
+   7. /analytics 第 07 章的「进入大屏」入口卡
+   ============================================================ */
+.screen-entry {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  margin-top: 20px;
+  padding: 26px 28px;
+  text-align: left;
+  cursor: pointer;
+  color: var(--u-text);
+  background: linear-gradient(120deg, rgba(13, 17, 23, 0.9), rgba(5, 5, 10, 0.75));
+  border: 1px solid var(--u-line);
+  clip-path: var(--u-poly);
+  --u-cut: 18px;
+  overflow: hidden;
+  transition: border-color .25s ease, transform .25s ease;
+}
+.screen-entry:hover { border-color: var(--u-line-strong); transform: translateY(-2px); }
+.screen-entry__glow {
+  position: absolute;
+  inset: -40% -10% auto auto;
+  width: 420px;
+  height: 420px;
+  background: radial-gradient(circle, rgba(201, 169, 110, 0.16), transparent 70%);
+  pointer-events: none;
+}
+.screen-entry__tag {
+  font-family: var(--u-font-tech);
+  font-size: 10px;
+  letter-spacing: 2.4px;
+  color: var(--u-gold);
+}
+.screen-entry__title {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+}
+.screen-entry__desc { font-size: 13px; color: var(--u-text-2); line-height: 1.7; }
+.screen-entry__go {
+  margin-top: 6px;
+  font-family: var(--u-font-tech);
+  font-size: 12px;
+  letter-spacing: 2px;
+  color: var(--u-gold);
+}
+
+/* 无障碍：尊重系统减弱动效偏好 */
+@media (prefers-reduced-motion: reduce) {
+  .stream-track { animation: none; }
+  .canvas-placeholder__core { animation: none; }
+  .top-bar__dot { animation: none; }
+}

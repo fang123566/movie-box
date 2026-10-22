@@ -1,7 +1,46 @@
+# ============================================================
+# 电影盒子（主项目） + 旧 Flask 电影推荐系统（movie_system_api/）
+# ============================================================
+
+# ---------- 通用 ----------
 .env
-backups/
 __pycache__/
-*.pyc
+*.py[cod]
+*.egg-info/
 .idea/
+.vscode/
 *.bak
+*.log
+.DS_Store
+Thumbs.db
+
+# ---------- 本地工作区（记忆/截图/诊断，属个人文件，不入库） ----------
+.workbuddy/
+
+# ---------- 旧 Flask 系统 ----------
+backups/
 movie_system_api/logs/
+
+# ---------- Python 虚拟环境 ----------
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+
+# ---------- 数据湖：体积大且可重新生成，不入库 ----------
+data_lake/raw/
+data_lake/interim/
+data_lake/processed/
+data_lake/imdb_datasets/
+data_lake/imdb_datasets_demo/
+# Kaggle 数据集原始文件（66 MB 起，随时可重新下载）
+data_lake/kaggle_reviews/
+data_lake/kaggle_reviews_demo/
+# 影评逐条打分明细（3.3 MB，run_analysis score 可随时重跑重生成）
+data_lake/analysis/reviews_scored.jsonl
+!data_lake/**/.gitkeep
+
+# ---------- 前端 ----------
+node_modules/
+frontend/dist/
+frontend/.vite/
