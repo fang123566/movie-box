@@ -305,14 +305,16 @@ function check(name, ok, extra = '') {
   await page.screenshot({ path: `${OUT}/screen-room-galaxy.png` })
 
   /* ---------- 每间展厅的两翼面板与门"对应"（用户 2026-10-22 要求） ----------
-     不再每间房都摆同一套"回声廊+叙事轴"，而是按门主题取各自专属面板。 */
+     不再每间房都摆同一套"回声廊+叙事轴"，而是按门主题取各自专属面板。
+     2026-11-01 起 flow 右翼加「地区画像」、diverge 右翼加「分化榜」做默认，
+     这两房右 2 标签属有意设计（同主题双视角），其余房仍各 1 个。 */
   const PANEL_OK = {
-    galaxy:  ['跨文化回声廊', '叙事时间轴'],
-    box:     ['全球票房榜', '年度票房'],
-    rank:    ['豆瓣口碑', '类型口碑榜'],
-    flow:    ['叙事时间轴', '预告覆盖'],
-    diverge: ['豆瓣口碑', '跨文化回声廊'],
-    globe:   ['预告覆盖', '叙事时间轴'],
+    galaxy:  ['跨文化回声廊', '叙事时间轴', 1, 1],
+    box:     ['全球票房榜', '年度票房', 1, 1],
+    rank:    ['豆瓣口碑', '类型口碑榜', 1, 1],
+    flow:    ['叙事时间轴', '国家 / 地区', 1, 2],
+    diverge: ['豆瓣口碑', '观众评分分化榜', 1, 2],
+    globe:   ['预告覆盖', '叙事时间轴', 1, 1],
   }
   for (const key of Object.keys(PANEL_OK)) {
     await page.goto(BASE + '/screen?room=' + key, { waitUntil: 'networkidle2', timeout: 60000 })
@@ -324,11 +326,57 @@ function check(name, ok, extra = '') {
       ltabs: [...document.querySelectorAll('.left-panel .panel-tab')].map((e) => e.textContent.trim()),
       rtabs: [...document.querySelectorAll('.right-panel .panel-tab')].map((e) => e.textContent.trim()),
     }))
-    const [expL, expR] = PANEL_OK[key]
+    const [expL, expR, expLC, expRC] = PANEL_OK[key]
     check(`展厅[${key}] 左翼面板对应`, p.left === expL, `${p.left} (期望 ${expL})`)
     check(`展厅[${key}] 右翼面板对应`, p.right === expR, `${p.right} (期望 ${expR})`)
-    check(`展厅[${key}] 标签精简为该房专属`, p.ltabs.length === 1 && p.rtabs.length === 1, `左 ${p.ltabs.length} / 右 ${p.rtabs.length}`)
+    check(`展厅[${key}] 标签精简为该房专属`, p.ltabs.length === expLC && p.rtabs.length === expRC, `左 ${p.ltabs.length} / 右 ${p.rtabs.length}`)
   }
+
+  /* ---------- 2026-11-01 新增：馆长洞察卡 / 评分分化榜 / 地区气泡图 ---------- */
+  // 大厅洞察卡：house 模式底部托盘，真实分析结论 + 点卡直达展厅
+  await page.goto(BASE + '/screen', { waitUntil: 'networkidle2', timeout: 60000 })
+  await sleep(1500)
+  const hi = await page.evaluate(() => {
+    const cards = [...document.querySelectorAll('.hi__card')]
+    return {
+      count: cards.length,
+      text: (document.querySelector('.hi') || {}).innerText || '',
+      clickable: cards.length > 0 && getComputedStyle(cards[0]).pointerEvents === 'auto',
+    }
+  })
+  check('大厅馆长洞察卡叠渲染', hi.count >= 2, `cards=${hi.count}`)
+  check('洞察卡为真实分析结论', /评分波动|口碑王|正面率/.test(hi.text), hi.text.slice(0, 40))
+  check('洞察卡可点击直达展厅', hi.clickable === true, `pointerEvents=${hi.clickable}`)
+
+  // 评分分化榜：榜单 + 真实好评/差评引文
+  await page.goto(BASE + '/screen?room=diverge', { waitUntil: 'networkidle2', timeout: 60000 })
+  await page.waitForSelector('.room-nav', { timeout: 20000 })
+  await sleep(1000)
+  const pb = await page.evaluate(() => ({
+    rows: document.querySelectorAll('.pb__row').length,
+    quotes: document.querySelectorAll('.pb__q').length,
+    hasPos: !!document.querySelector('.pb__q--pos'),
+    hasNeg: !!document.querySelector('.pb__q--neg'),
+    firstTitle: (document.querySelector('.pb__row .pb__meta b') || {}).textContent,
+  }))
+  check('分化榜榜单渲染', pb.rows >= 5, `rows=${pb.rows}`)
+  check('分化榜好评差评引文并存', pb.quotes >= 2 && pb.hasPos && pb.hasNeg, `quotes=${pb.quotes}`)
+  // 点第二行 → 引文切换（交互）
+  await page.evaluate(() => { const r = document.querySelectorAll('.pb__row')[1]; r && r.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+  await sleep(500)
+  const pb2 = await page.evaluate(() => (document.querySelector('.pb__film b') || {}).textContent)
+  check('分化榜点片切换引文', !!pb2 && pb2 !== pb.firstTitle, `${pb.firstTitle} -> ${pb2}`)
+
+  // 地区气泡图：canvas 渲染 + 产量王/口碑王图例
+  await page.goto(BASE + '/screen?room=flow', { waitUntil: 'networkidle2', timeout: 60000 })
+  await page.waitForSelector('.room-nav', { timeout: 20000 })
+  await sleep(1200)
+  const rg = await page.evaluate(() => ({
+    canvas: document.querySelectorAll('.rg__chart canvas').length,
+    legend: (document.querySelector('.rg__legend') || {}).innerText || '',
+  }))
+  check('地区气泡图渲染', rg.canvas >= 1, `canvas=${rg.canvas}`)
+  check('地区图例含产量王口碑王', /产量王/.test(rg.legend) && /口碑王/.test(rg.legend), rg.legend.replace(/\s+/g, ' '))
 
   /* ---------- 票房分析展厅：itomdev 式相框绳画廊（2026-10-22 新增） ---------- */
   await page.goto(BASE + '/screen?room=box', { waitUntil: 'networkidle2', timeout: 60000 })

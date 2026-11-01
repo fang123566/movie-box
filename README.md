@@ -136,7 +136,6 @@ movie-recommendation-system-main/
 │   ├── web_movies.json       120 部中文片库（95 部带 tmdb_id），本平台种子片库
 │   ├── chinese_title_map.py  英文片名 → 中文译名映射（ingest 在用）
 │   └── chinese_domestic_movies.py  国产片补充数据
-└── docs/                     方案与交付文档（phase5 前端方案 / 交付说明）
 ```
 
 ---
@@ -167,7 +166,6 @@ docker-compose up -d
 
 > 数据已 bake 进后端镜像，**不需要**在宿主机准备数据文件或先跑采集管线。
 > 想清库重来：`docker-compose down -v && docker-compose up -d`，会重新自动导一遍。
-> 换端口 / 挂代理等细节见 [docs/delivery.md](docs/delivery.md)。
 
 ### 方式 B · 本机开发（采集 / 改代码 / 调参）
 
@@ -1314,7 +1312,7 @@ ES 7+ 默认只精确统计到 1 万条，影评有 4.99 万条，`hits.total` �
 **信息架构按 yuan 要求落地：数据面板不放在首页。** 首页 = 混合检索
 （电影盒子是检索与发现平台，不是管理后台）；数据面板独立为「影评洞察」页。
 技术选型 Vue3.5 + Vite 7 + Vue Router 4 + ECharts 5（按需引入，**不引 UI 框架**，
-手写 CSS 继承棕灰主题）。方案细节见 [`docs/phase5-frontend-plan.md`](docs/phase5-frontend-plan.md)。
+手写 CSS 继承棕灰主题）。
 
 ### 页面清单（6 视图 / 21 组件）
 
@@ -1648,8 +1646,8 @@ docker-compose build                 # 改了代码/Dockerfile 后重建
 docker-compose --profile tools up -d # 额外起 Kibana
 ```
 
-> 换端口、宿主机代理（容器内访问宿主机要用 `host.docker.internal`）、
-> 数据更新流程等细节见 [`docs/delivery.md`](docs/delivery.md)。
+> 换端口、宿主机代理（容器内访问宿主机要用 `host.docker.internal`），
+> 数据更新流程见上方「数据更新」小节。
 
 ---
 

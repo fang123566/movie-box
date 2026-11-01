@@ -173,6 +173,8 @@
                 :total-revenue="boxOffice?.total_revenue || 0"
                 :total-movies="boxOffice?.total_movies || 0"
               />
+              <PolarizingBoard v-else-if="rightTab === 'polarize'" :polarizing="polarizing" />
+              <RegionsPanel v-else-if="rightTab === 'regions'" :regions="regions" />
             </Transition>
           </div>
         </div>
@@ -256,6 +258,9 @@
 
     </div>
 
+    <!-- 大厅 · 馆长洞察卡叠（A24 编辑卡，点卡直达展厅；浮在 3D 场景之上） -->
+    <HallInsights v-if="mode === 'house'" :cards="story?.cards || []" @enter="enterRoom" />
+
     <!-- 手绘导览图（itomdev MAP 面板）：大厅=传送地图，展厅=当前位置 + 回大厅 -->
     <InsightMap
       v-if="mapOpen"
@@ -300,6 +305,9 @@ import CoveragePanel from '../components/screen/CoveragePanel.vue'
 import RollingNumber from '../components/screen/RollingNumber.vue'
 import InsightHouse from '../components/screen/InsightHouse.vue'
 import InsightMap from '../components/screen/InsightMap.vue'
+import HallInsights from '../components/screen/HallInsights.vue'
+import PolarizingBoard from '../components/screen/PolarizingBoard.vue'
+import RegionsPanel from '../components/screen/RegionsPanel.vue'
 // 取景地地球散点面板（重建版，迁入 screen 目录）
 const GlobeMapPanel = defineAsyncComponent(() => import('../components/screen/GlobeMapPanel.vue'))
 
@@ -316,6 +324,9 @@ const lexicon = ref(null)
 const reviews = ref([])
 const mapPoints = ref([])   // 取景地坐标（/fun/map）
 const douban = ref(null)    // 豆瓣联合洞察（/douban/insights，并入本大屏）
+const story = ref(null)        // 大厅馆长洞察卡（/insights/story）
+const polarizing = ref(null)   // 观众评分分化榜（/insights/polarizing）
+const regions = ref(null)      // 国家/地区画像（/insights/regions）
 
 const reviewTotal = computed(() => sentiment.value?.total || 0)
 const movieTotal = computed(() => trends.value?.total_movies || 0)
@@ -349,9 +360,9 @@ const VIEWS = [
   { key: 'rank', zh: '口碑排名', icon: '📈', desc: '各类型口碑位次变化', glow: '#A0522D', tint: '#B45309',
     left: ['douban'], right: ['rank'] },
   { key: 'flow', zh: '年代流向', icon: '🌊', desc: '类型与年代之间的影片流向', glow: '#0F766E', tint: '#0F766E',
-    left: ['story'], right: ['coverage'] },
+    left: ['story'], right: ['regions', 'coverage'] },
   { key: 'diverge', zh: '口碑分歧', icon: '⚖️', desc: '豆瓣评分与本站情感的分歧', glow: '#7D3C1E', tint: '#A67C2E',
-    left: ['douban'], right: ['echo'] },
+    left: ['douban'], right: ['polarize', 'echo'] },
   { key: 'globe', zh: '取景地图', icon: '🌍', desc: '全球取景地分布，可点光点看影片', glow: '#1E4E6B', tint: '#2563EB',
     left: ['coverage'], right: ['story'] },
 ]
@@ -367,6 +378,8 @@ const panelMeta = {
   coverage:{ zh: '预告覆盖',     en: '高分片预告触达',     tab: '预告覆盖', comp: 'CoveragePanel' },
   boxrank: { zh: '全球票房榜',   en: 'TOP 10', tab: '票房榜',   comp: 'BoxOfficeRank' },
   boxtrend:{ zh: '年度票房',     en: '上映年合计 · 亿美元', tab: '年度趋势', comp: 'BoxOfficeTrend' },
+  polarize:{ zh: '观众评分分化榜', en: '同一部片的满分与最低分', tab: '分化榜', comp: 'PolarizingBoard' },
+  regions: { zh: '国家 / 地区',  en: '产量 × 口碑 气泡图',   tab: '地区画像', comp: 'RegionsPanel' },
 }
 const view = ref('galaxy')
 
@@ -519,6 +532,10 @@ onMounted(async () => {
   api.map().then((d) => { mapPoints.value = d?.points || [] }).catch(() => {})
   // 豆瓣联合洞察（评分分歧 / 情感 / 高分 / 预告覆盖 / 类型情感）—— 并入本大屏
   api.doubanInsights().then((d) => { douban.value = d }).catch(() => {})
+  // 馆长洞察卡 + 评分分化榜 + 地区画像（2026-11-01 新增分析展厅数据源）
+  api.story().then((d) => { story.value = d }).catch(() => {})
+  api.polarizing().then((d) => { polarizing.value = d }).catch(() => {})
+  api.regions().then((d) => { regions.value = d }).catch(() => {})
 
   // 底部真实影评流（中文化：lang=zh 走索引 lang 字段，库内共 87 条中文影评，
   // 取两页拿全；CJK 比例兜底过滤防脏数据；sentiment 为 None 的中文影评用

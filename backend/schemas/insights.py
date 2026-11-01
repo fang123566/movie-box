@@ -223,3 +223,72 @@ class BoxOfficeResponse(BaseModel):
     gallery: list[BoxOfficeItem] = Field(default_factory=list)
     years: list[BoxOfficeYearBucket] = Field(default_factory=list)
     note: str | None = None
+
+
+# ============================================================
+# 口碑分化 / 地区画像 / 馆长洞察（2026-11-01 新增展厅分析）
+# ============================================================
+
+
+class Quote(BaseModel):
+    """一条真实影评引文：正文（后端已去 markdown / 链接 / 控长）+ 原作者评分。"""
+
+    text: str
+    rating: float | None = None
+
+
+class PolarizingItem(BaseModel):
+    """一部口碑两极分化的影片：评分标准差 + 正/负两条真实引文。"""
+
+    movie_id: str
+    title: str
+    title_en: str | None = None
+    year: int | None = None
+    review_count: int = 0
+    avg_rating: float | None = None
+    std_dev: float | None = Field(default=None, description="评分标准差，越大观众分歧越大")
+    pos_quote: Quote | None = None
+    neg_quote: Quote | None = None
+
+
+class PolarizingResponse(BaseModel):
+    """口碑分化榜。total_qualified = 库内有足够评分影评、可计算分化的影片总数。"""
+
+    total_qualified: int = 0
+    items: list[PolarizingItem] = Field(default_factory=list)
+
+
+class RegionItem(BaseModel):
+    country: str
+    movies: int = 0
+    avg_rating: float | None = None
+    avg_votes: int | None = None
+
+
+class RegionsResponse(BaseModel):
+    """地区画像：主出品国产量与口碑对照（按片数倒序）。"""
+
+    items: list[RegionItem] = Field(default_factory=list)
+
+
+class StoryFact(BaseModel):
+    """洞察卡上一行键值（A24 credits 式）：k 左对齐，v 右对齐。"""
+
+    k: str
+    v: str
+    big: bool = Field(default=False, description="衬线大字渲染（该卡的核心数字）")
+
+
+class StoryCard(BaseModel):
+    """大厅「馆长洞察」卡：一句结论问句 + 若干键值行，点卡直达对应展厅。"""
+
+    kind: str = Field(description="polarizing / regions / sentiment，决定图标与配色")
+    kicker: str = Field(description="顶部小标签")
+    question: str = Field(description="结论问句（大字）")
+    answer: str = Field(description="辅助说明一句")
+    facts: list[StoryFact] = Field(default_factory=list)
+    room: str = Field(description="点卡进入的展厅 key（对齐前端 VIEWS）")
+
+
+class StoryResponse(BaseModel):
+    cards: list[StoryCard] = Field(default_factory=list)

@@ -571,6 +571,74 @@ def build_box_office_years() -> dict:
 
 
 # ============================================================
+# 口碑分化 / 地区画像（2026-11-01 新增洞察展厅）
+# ============================================================
+
+
+def build_polarizing(min_reviews: int = 8) -> dict:
+    """口碑分化聚合：影评按影片分桶，算评分标准差 + 抓最高/最低分真实影评作引文。
+
+    数据口径：只有"弱关联"到影片的那批影评（约 2600 条）同时带 movie_id 和 rating，
+    所以分化的分母是这批 —— 如实取，不拿 5 万条无影片关联的影评凑数。
+    引文按 rating 取（这批影评没有 sentiment_score），top_hits 各取 3 条，
+    后端再择优（去 markdown / 去链接推广 / 控长度），避免单条恰好是广告文。
+    """
+    quote_filter = {"bool": {"filter": [
+        {"exists": {"field": "rating"}},
+        {"range": {"text_len": {"gte": 50}}},
+    ]}}
+    return {
+        "size": 0,
+        "track_total_hits": False,
+        "aggs": {
+            "by_movie": {
+                "terms": {"field": "movie_id", "size": 60, "min_doc_count": min_reviews},
+                "aggs": {
+                    "stats": {"extended_stats": {"field": "rating"}},
+                    "pos": {
+                        "filter": quote_filter,
+                        "aggs": {"hit": {"top_hits": {
+                            "size": 3,
+                            "sort": [{"rating": "desc"}],
+                            "_source": ["text", "rating"],
+                        }}},
+                    },
+                    "neg": {
+                        "filter": quote_filter,
+                        "aggs": {"hit": {"top_hits": {
+                            "size": 3,
+                            "sort": [{"rating": "asc"}],
+                            "_source": ["text", "rating"],
+                        }}},
+                    },
+                },
+            }
+        },
+    }
+
+
+def build_regions(min_movies: int = 3) -> dict:
+    """地区画像聚合：按主出品国分桶，统计片数、均分与平均评价数。
+
+    primary_country 是融合层锁定的"主出品国"（按 original_language 判定），
+    比 production_countries 列表顺序的第一项可靠（见 normalize.pick_primary_country）。
+    """
+    return {
+        "size": 0,
+        "track_total_hits": False,
+        "aggs": {
+            "by_country": {
+                "terms": {"field": "primary_country", "size": 15, "min_doc_count": min_movies},
+                "aggs": {
+                    "avg_rating": {"avg": {"field": "vote_average"}},
+                    "avg_votes": {"avg": {"field": "vote_count"}},
+                },
+            }
+        },
+    }
+
+
+# ============================================================
 # 趣味功能（阶段 5 前功能补全）：盲盒 / 足迹地图
 # ============================================================
 

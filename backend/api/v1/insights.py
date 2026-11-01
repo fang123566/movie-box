@@ -21,6 +21,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -37,10 +38,18 @@ from backend.schemas.insights import (
     MatrixResponse,
     MatrixRow,
     MovieInsight,
+    PolarizingItem,
+    PolarizingResponse,
+    Quote,
+    RegionItem,
+    RegionsResponse,
     ScoreRequest,
     ScoreResponse,
     SentimentBucket,
     SentimentStats,
+    StoryCard,
+    StoryFact,
+    StoryResponse,
     TopicItem,
     TopicsResponse,
     TrendBucket,
@@ -51,6 +60,8 @@ from backend.services.query_builder import (
     build_box_office_years,
     build_decade_aggs,
     build_genre_decade_matrix,
+    build_polarizing,
+    build_regions,
 )
 from backend.services.search_service import SearchUnavailable, get_movie
 from common.es_client import get_es
@@ -512,3 +523,231 @@ async def movie_insight(movie_id: str) -> MovieInsight:
         keywords=keywords,
         sentiment_hint=hint,
     )
+
+
+# ============================================================
+# 口碑分化 / 地区画像 / 馆长洞察（2026-11-01 新增展厅分析）
+# ============================================================
+
+# 引文清洗：影评原文常带 markdown  emphasis / 链接推广，直接上大屏很脏。
+_MD = re.compile(r"[*_>#`~]+")
+_URL = re.compile(r"https?://\S+", re.I)
+_SPAM = re.compile(r"check out my (full )?review|read my (full )?review|full review @", re.I)
+_WS = re.compile(r"\s+")
+
+
+def _clean_quote(text: str | None) -> str | None:
+    """把一条影评原文洗成可上大屏的引文；太短则放弃。"""
+    if not text:
+        return None
+    t = _MD.sub("", text)
+    t = _URL.sub("", t)                 # 链接删掉（留着是一串乱码域名）
+    t = _WS.sub(" ", t).strip(" .,;:!—-\t")
+    if len(t) < 20:                      # 洗完后太短，不构成引文
+        return None
+    return t[:220]
+
+
+def _pick_quote(hits: list[dict]) -> Quote | None:
+    """top_hits 给了 3 条候选，挑第一条"干净"的（非推广文、清洗后够长）。"""
+    for h in hits:
+        s = h.get("_source") or {}
+        if _SPAM.search(s.get("text") or ""):
+            continue
+        t = _clean_quote(s.get("text"))
+        if t:
+            return Quote(text=t, rating=s.get("rating"))
+    return None
+
+
+async def _movie_titles(ids: list[str]) -> dict[str, dict]:
+    """按 movie_id 批量回 movies 索引取中英文名（分化榜的 id 是 IMDb tt 号）。"""
+    if not ids:
+        return {}
+    try:
+        es = get_es().options(request_timeout=15)
+        resp = await es.search(
+            index=settings.es_index_movies,
+            size=len(ids),
+            query={"terms": {"movie_id": ids}},
+            _source=["movie_id", "title", "title_zh", "title_en", "release_year"],
+        )
+    except Exception:  # noqa: BLE001 —— 取名失败不致命，退回用 movie_id 显示
+        return {}
+    out: dict[str, dict] = {}
+    for h in resp.get("hits", {}).get("hits", []):
+        s = h.get("_source") or {}
+        if s.get("movie_id"):
+            out[s["movie_id"]] = s
+    return out
+
+
+@router.get("/polarizing", response_model=PolarizingResponse, summary="口碑分化榜（评分标准差 + 真实引文）")
+async def polarizing() -> PolarizingResponse:
+    """观众内部的分歧：同一部片，有人打满分有人打最低分。
+
+    按评分标准差排序取前 10；每部附"评分最高的真实影评"（好评引文）与
+    "评分最低的真实影评"（差评引文）——引文来自本片真实语料，非模板。
+    ★ 缓存：扫全量关联影评的聚合，进 TTL 缓存（默认 5 分钟）。
+    """
+    async def _produce() -> PolarizingResponse:
+        es = get_es().options(request_timeout=20)
+        try:
+            resp = await es.search(
+                index=settings.es_index_reviews, **build_polarizing())
+        except Exception as exc:  # noqa: BLE001
+            raise _guard(SearchUnavailable(f"{type(exc).__name__}: {exc}")) from exc
+
+        cand: list[dict] = []
+        for b in resp.get("aggregations", {}).get("by_movie", {}).get("buckets", []):
+            st = b.get("stats") or {}
+            sd = st.get("std_deviation")
+            cnt = int(st.get("count") or 0)
+            if not sd or cnt < 8:
+                continue
+            pos_hits = (b.get("pos", {}).get("hit", {}).get("hits", {}).get("hits")) or []
+            neg_hits = (b.get("neg", {}).get("hit", {}).get("hits", {}).get("hits")) or []
+            cand.append({
+                "movie_id": str(b["key"]), "review_count": cnt,
+                "avg_rating": st.get("avg"), "std_dev": sd,
+                "pos": _pick_quote(pos_hits), "neg": _pick_quote(neg_hits),
+            })
+        cand.sort(key=lambda c: -(c["std_dev"] or 0))
+
+        total_qualified = len(cand)
+        cand = cand[:10]
+        titles = await _movie_titles([c["movie_id"] for c in cand])
+        items = []
+        for c in cand:
+            t = titles.get(c["movie_id"]) or {}
+            items.append(PolarizingItem(
+                movie_id=c["movie_id"],
+                title=str(t.get("title_zh") or t.get("title") or c["movie_id"]),
+                title_en=t.get("title_en"),
+                year=t.get("release_year"),
+                review_count=c["review_count"],
+                avg_rating=(round(c["avg_rating"], 2)
+                            if c["avg_rating"] is not None else None),
+                std_dev=(round(c["std_dev"], 2)
+                         if c["std_dev"] is not None else None),
+                pos_quote=c["pos"], neg_quote=c["neg"],
+            ))
+        return PolarizingResponse(total_qualified=total_qualified, items=items)
+
+    try:
+        return await cache.get_or_set("insights:polarizing", _produce)
+    except SearchUnavailable as exc:
+        raise es_unavailable(exc) from exc
+
+
+@router.get("/regions", response_model=RegionsResponse, summary="地区画像（主出品国产量与口碑）")
+async def regions() -> RegionsResponse:
+    """各主出品国的影片数与均分对照（产量王 ≠ 口碑王的数据源）。
+
+    ★ 缓存：全库 terms 聚合，进 TTL 缓存。
+    """
+    async def _produce() -> RegionsResponse:
+        es = get_es().options(request_timeout=15)
+        try:
+            resp = await es.search(
+                index=settings.es_index_movies, **build_regions())
+        except Exception as exc:  # noqa: BLE001
+            raise _guard(SearchUnavailable(f"{type(exc).__name__}: {exc}")) from exc
+
+        items = [
+            RegionItem(
+                country=str(b["key"]),
+                movies=int(b["doc_count"]),
+                avg_rating=(round(b["avg_rating"]["value"], 2)
+                            if b.get("avg_rating", {}).get("value") is not None else None),
+                avg_votes=(int(b["avg_votes"]["value"])
+                           if b.get("avg_votes", {}).get("value") is not None else None),
+            )
+            for b in resp.get("aggregations", {}).get("by_country", {}).get("buckets", [])
+        ]
+        items.sort(key=lambda i: -i.movies)
+        return RegionsResponse(items=items)
+
+    try:
+        return await cache.get_or_set("insights:regions", _produce)
+    except SearchUnavailable as exc:
+        raise es_unavailable(exc) from exc
+
+
+@router.get("/story", response_model=StoryResponse, summary="馆长洞察卡（大厅结论卡叠）")
+async def story() -> StoryResponse:
+    """大厅入口的三张结论卡：每卡一个分析发现，数据全部由各分析接口实时算出。
+
+    设计成"容错组合"：某一路分析挂了只跳过那张卡，不让整叠卡消失。
+    ★ 缓存：依赖的 polarizing/regions/sentiment 都是缓存的，这里再包一层短缓存。
+    """
+    async def _produce() -> StoryResponse:
+        cards: list[StoryCard] = []
+
+        try:
+            pol = await polarizing()
+            if pol.items:
+                top = pol.items[0]
+                cards.append(StoryCard(
+                    kind="polarizing", kicker="口碑分化",
+                    question="观众吵得最凶的一部片",
+                    answer="同一部片，有人打满分，有人打最低分",
+                    facts=[
+                        StoryFact(k="影片", v=top.title),
+                        StoryFact(k="评分波动", v=f"{top.std_dev:.2f}", big=True),
+                        StoryFact(k="样本评价", v=f"{top.review_count} 条"),
+                    ],
+                    room="diverge",
+                ))
+        except HTTPException:
+            pass
+
+        try:
+            reg = await regions()
+            rated = [r for r in reg.items if r.avg_rating is not None]
+            # 口碑王要有像样样本（>=8 部），否则 4 部小样本的 9.2 分没有说服力
+            rated_sig = [r for r in rated if r.movies >= 8] or rated
+            if reg.items and rated_sig:
+                by_count = max(reg.items, key=lambda r: r.movies)
+                by_rating = max(rated_sig, key=lambda r: r.avg_rating or 0)
+                cards.append(StoryCard(
+                    kind="regions", kicker="地区画像",
+                    question="产量王 ≠ 口碑王",
+                    answer="片子最多的国家，均分并不是最高",
+                    facts=[
+                        StoryFact(k="产量王", v=f"{by_count.country} · {by_count.movies} 部"),
+                        StoryFact(k="口碑王", v=f"{by_rating.country} · {by_rating.avg_rating:.1f} 分",
+                                  big=True),
+                        StoryFact(k=f"{by_count.country}均分",
+                                  v=f"{by_count.avg_rating:.2f} 分"),
+                    ],
+                    room="flow",
+                ))
+        except HTTPException:
+            pass
+
+        try:
+            stats = await sentiment_stats()
+            topics_data = _load_artifact("topics.json", "主题统计")
+            pos_vocab = list(topics_data.get("positive_vocabulary") or [])
+            neg_vocab = list(topics_data.get("negative_vocabulary") or [])
+            cards.append(StoryCard(
+                kind="sentiment", kicker="好评风向",
+                question="观众最常说的好评词",
+                answer="归纳式情感分析 · 5 万条真实语料",
+                facts=[
+                    StoryFact(k="正面率", v=f"{stats.positive_ratio * 100:.0f}%", big=True),
+                    StoryFact(k="最热好评词", v=pos_vocab[0] if pos_vocab else "—"),
+                    StoryFact(k="最热差评词", v=neg_vocab[0] if neg_vocab else "—"),
+                ],
+                room="galaxy",
+            ))
+        except HTTPException:
+            pass
+
+        return StoryResponse(cards=cards)
+
+    try:
+        return await cache.get_or_set("insights:story", _produce)
+    except SearchUnavailable as exc:
+        raise es_unavailable(exc) from exc
