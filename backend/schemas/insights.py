@@ -238,12 +238,19 @@ class Quote(BaseModel):
 
 
 class PolarizingItem(BaseModel):
-    """一部口碑两极分化的影片：评分标准差 + 正/负两条真实引文。"""
+    """一部口碑两极分化的影片：评分标准差 + 正/负两条真实引文。
+
+    为前端 A24 影片展补充：poster_url（真实圆盘海报）、director（credits）、
+    vote_average（星级）。poster_url 已由 rewrite_poster_url 改写为代理路径。
+    """
 
     movie_id: str
     title: str
     title_en: str | None = None
     year: int | None = None
+    director: str | None = None
+    poster_url: str | None = None
+    vote_average: float | None = None
     review_count: int = 0
     avg_rating: float | None = None
     std_dev: float | None = Field(default=None, description="评分标准差，越大观众分歧越大")

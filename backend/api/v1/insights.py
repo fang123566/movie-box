@@ -28,6 +28,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 
 from backend.api.v1.errors import es_unavailable as _guard
+from backend.api.v1.img import rewrite_poster_url
 from backend.schemas.insights import (
     GenreRating,
     BoxOfficeItem,
@@ -570,7 +571,8 @@ async def _movie_titles(ids: list[str]) -> dict[str, dict]:
             index=settings.es_index_movies,
             size=len(ids),
             query={"terms": {"movie_id": ids}},
-            _source=["movie_id", "title", "title_zh", "title_en", "release_year"],
+            _source=["movie_id", "title", "title_zh", "title_en", "release_year",
+                     "director", "poster_url", "vote_average"],
         )
     except Exception:  # noqa: BLE001 —— 取名失败不致命，退回用 movie_id 显示
         return {}
@@ -625,6 +627,9 @@ async def polarizing() -> PolarizingResponse:
                 title=str(t.get("title_zh") or t.get("title") or c["movie_id"]),
                 title_en=t.get("title_en"),
                 year=t.get("release_year"),
+                director=t.get("director"),
+                poster_url=rewrite_poster_url(t.get("poster_url")),
+                vote_average=t.get("vote_average"),
                 review_count=c["review_count"],
                 avg_rating=(round(c["avg_rating"], 2)
                             if c["avg_rating"] is not None else None),

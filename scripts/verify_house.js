@@ -348,24 +348,28 @@ function check(name, ok, extra = '') {
   check('洞察卡为真实分析结论', /评分波动|口碑王|正面率/.test(hi.text), hi.text.slice(0, 40))
   check('洞察卡可点击直达展厅', hi.clickable === true, `pointerEvents=${hi.clickable}`)
 
-  // 评分分化榜：榜单 + 真实好评/差评引文
+  // 评分分化榜 · A24 影片展：圆盘索引 + 真实好评/差评引文
   await page.goto(BASE + '/screen?room=diverge', { waitUntil: 'networkidle2', timeout: 60000 })
   await page.waitForSelector('.room-nav', { timeout: 20000 })
   await sleep(1000)
   const pb = await page.evaluate(() => ({
-    rows: document.querySelectorAll('.pb__row').length,
-    quotes: document.querySelectorAll('.pb__q').length,
-    hasPos: !!document.querySelector('.pb__q--pos'),
-    hasNeg: !!document.querySelector('.pb__q--neg'),
-    firstTitle: (document.querySelector('.pb__row .pb__meta b') || {}).textContent,
+    idx: document.querySelectorAll('.idx__d').length,
+    disc: !!document.querySelector('.disc'),
+    stars: document.querySelectorAll('.star').length,
+    quotes: document.querySelectorAll('.quote').length,
+    hasPos: !!document.querySelector('.quote--pos'),
+    hasNeg: !!document.querySelector('.quote--neg'),
+    firstTitle: (document.querySelector('.pb__film') || {}).textContent,
   }))
-  check('分化榜榜单渲染', pb.rows >= 5, `rows=${pb.rows}`)
+  check('分化榜圆盘索引渲染', pb.idx >= 5, `idx=${pb.idx}`)
+  check('分化榜海报圆盘渲染', pb.disc, `disc=${pb.disc}`)
+  check('分化榜星级渲染', pb.stars === 5, `stars=${pb.stars}`)
   check('分化榜好评差评引文并存', pb.quotes >= 2 && pb.hasPos && pb.hasNeg, `quotes=${pb.quotes}`)
-  // 点第二行 → 引文切换（交互）
-  await page.evaluate(() => { const r = document.querySelectorAll('.pb__row')[1]; r && r.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+  // 点索引第二张圆盘 → 主视觉切换（交互）
+  await page.evaluate(() => { const r = document.querySelectorAll('.idx__d')[1]; r && r.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
   await sleep(500)
-  const pb2 = await page.evaluate(() => (document.querySelector('.pb__film b') || {}).textContent)
-  check('分化榜点片切换引文', !!pb2 && pb2 !== pb.firstTitle, `${pb.firstTitle} -> ${pb2}`)
+  const pb2 = await page.evaluate(() => (document.querySelector('.pb__film') || {}).textContent)
+  check('分化榜点圆盘切换影片', !!pb2 && pb2 !== pb.firstTitle, `${pb.firstTitle} -> ${pb2}`)
 
   // 地区气泡图：canvas 渲染 + 产量王/口碑王图例
   await page.goto(BASE + '/screen?room=flow', { waitUntil: 'networkidle2', timeout: 60000 })
