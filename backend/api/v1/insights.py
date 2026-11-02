@@ -739,7 +739,7 @@ async def story() -> StoryResponse:
             cards.append(StoryCard(
                 kind="sentiment", kicker="好评风向",
                 question="观众最常说的好评词",
-                answer="归纳式情感分析 · 5 万条真实语料",
+                answer="好话和坏话，观众都讲得很直白",
                 facts=[
                     StoryFact(k="正面率", v=f"{stats.positive_ratio * 100:.0f}%", big=True),
                     StoryFact(k="最热好评词", v=pos_vocab[0] if pos_vocab else "—"),

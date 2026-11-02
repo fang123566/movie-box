@@ -33,7 +33,19 @@
             @pointerleave="onUntilt"
           >
             <div class="disc__face" :style="posterBg(cur)">
-              <span v-if="!cur.poster_url" class="disc__label">{{ cur.title }}</span>
+              <!-- 有海报用 <img>（可捕获裂图），加载失败/无海报则回落到设计海报 -->
+              <img
+                v-if="posterOk(cur)"
+                class="disc__img"
+                :src="cur.poster_url"
+                :alt="cur.title"
+                @error="markFailed(cur.poster_url)"
+              />
+              <span v-else class="disc__ph">
+                <em class="disc__ph-k">FILM POSTER</em>
+                <b class="disc__ph-t">{{ cur.title }}</b>
+                <em class="disc__ph-y">{{ cur.year || '—' }}</em>
+              </span>
             </div>
             <i class="disc__hole" />
             <i class="disc__shine" />
@@ -43,13 +55,29 @@
           <div class="credits">
             <div class="cr"><span class="cr__k">DIRECTED BY</span><span class="cr__v">{{ cur.director || '—' }}</span></div>
             <div class="cr"><span class="cr__k">YEAR</span><span class="cr__v">{{ cur.year || '—' }}</span></div>
-            <div class="cr"><span class="cr__k">评分</span><span class="cr__v">{{ fmt(cur.vote_average) }}</span></div>
+            <div class="cr"><span class="cr__k">媒体均分</span><span class="cr__v">{{ fmt(cur.vote_average) }}</span></div>
+            <div class="cr"><span class="cr__k">观众均分</span><span class="cr__v">{{ fmt(cur.avg_rating) }}</span></div>
+            <div class="cr"><span class="cr__k">评价样本</span><span class="cr__v">{{ cur.review_count || 0 }} 条</span></div>
           </div>
 
           <!-- 媒体星级（由 vote_average/2 折算，支持半星） -->
           <div class="stars" :aria-label="`评分 ${fmt(cur.vote_average)} / 10`">
             <i v-for="(s, i) in stars" :key="i" class="star" :class="s">★</i>
             <span class="stars__num">{{ fmt(cur.vote_average) }}</span>
+          </div>
+
+          <!-- 观众 vs 媒体：两条对比条，一眼看出"专业口碑"和"观众口碑"的差距 -->
+          <div class="cmp" aria-label="观众均分与媒体均分对比">
+            <div class="cmp__row">
+              <span class="cmp__k">观众</span>
+              <span class="cmp__bar"><i :style="{ width: pct10(cur.avg_rating) }" /></span>
+              <b class="cmp__v">{{ fmt(cur.avg_rating) }}</b>
+            </div>
+            <div class="cmp__row">
+              <span class="cmp__k">媒体</span>
+              <span class="cmp__bar cmp__bar--media"><i :style="{ width: pct10(cur.vote_average) }" /></span>
+              <b class="cmp__v">{{ fmt(cur.vote_average) }}</b>
+            </div>
           </div>
 
           <!-- 分化指数：本榜的分析指标（标准差越大越两极） -->
@@ -86,7 +114,14 @@
         :aria-selected="i === sel"
         @click="sel = i"
       >
-        <span v-if="!it.poster_url" class="idx__no">{{ i + 1 }}</span>
+        <img
+          v-if="posterOk(it)"
+          class="idx__img"
+          :src="it.poster_url"
+          :alt="it.title"
+          @error="markFailed(it.poster_url)"
+        />
+        <span v-else class="idx__no">{{ i + 1 }}</span>
       </button>
     </div>
   </div>
@@ -109,6 +144,8 @@ const cur = computed(() => items.value[sel.value] || null)
 
 const fmt = (n) => (n === null || n === undefined ? '—' : Number(n).toFixed(1))
 const scoreOf = (r) => (r === null || r === undefined ? '?' : Math.round(Number(r)))
+// 10 分制 → 百分比条宽
+const pct10 = (n) => (n === null || n === undefined ? '0%' : `${Math.max(0, Math.min(100, Number(n) * 10))}%`)
 
 // 媒体星级：vote_average(/10) → /5，支持半星
 const stars = computed(() => {
@@ -120,16 +157,28 @@ const stars = computed(() => {
   })
 })
 
-// 真实海报圆盘背景
+// 无海报时的极简海报：按片名/ID 哈希出一组双色渐变，
+// 每部片颜色不同，看起来像一张设计过的概念海报，而不是空白盘。
+function fallbackGradient(it) {
+  const seed = String(it?.movie_id || it?.title || 'film')
+  let h = 0
+  for (const ch of seed) h = (h * 31 + ch.charCodeAt(0)) % 360
+  const hi = `hsl(${(h + 46) % 360} 44% 58%)`
+  const lo = `hsl(${h} 42% 32%)`
+  return `radial-gradient(circle at 34% 26%, ${hi}, ${lo} 64%, #241c15 100%)`
+}
+
+// 记录裂图 URL：一旦 <img> 报错就切到设计海报，避免"有字段但图裂"又变空白盘
+const failed = reactive(new Set())
+const posterOk = (it) => !!(it?.poster_url && !failed.has(it.poster_url))
+function markFailed(url) { if (url) failed.add(url) }
+
+// 有真实海报时背景留空（由 <img> 呈现）；否则铺哈希渐变
 function posterBg(it) {
-  return it?.poster_url
-    ? { backgroundImage: `url("${it.poster_url}")`, backgroundSize: 'cover', backgroundPosition: 'center' }
-    : {}
+  return posterOk(it) ? {} : { backgroundImage: fallbackGradient(it) }
 }
 function thumbBg(it) {
-  return it?.poster_url
-    ? { backgroundImage: `url("${it.poster_url}")`, backgroundSize: 'cover', backgroundPosition: 'center' }
-    : {}
+  return posterOk(it) ? {} : { backgroundImage: fallbackGradient(it) }
 }
 
 // 圆盘 3D 倾斜
@@ -194,13 +243,35 @@ function onUntilt() {
   0%, 100% { transform: translateY(0) rotate(-.6deg); }
   50% { transform: translateY(-7px) rotate(.6deg); }
 }
-.disc__label {
+/* 无海报兜底：极简海报（胶片竖纹 + 衬线片名 + 年份），不再是空白盘 */
+.disc__img {
   position: absolute; inset: 0;
-  display: flex; align-items: center; justify-content: center;
-  padding: 16px;
-  font-family: "Kaiti SC", KaiTi, STKaiti, serif;
-  font-size: 15px; font-weight: 700; line-height: 1.25; color: #4A2E16;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
 }
+.disc__ph {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+  gap: 3px; padding: 0 16px 22px; text-align: center;
+  color: #FBF3E4;
+  /* 下半部压暗：片名压在深色区上，浅底渐变也不会糊字；竖纹保留胶片感 */
+  background-image:
+    linear-gradient(to top, rgba(20, 14, 8, .62) 0%, rgba(20, 14, 8, 0) 48%),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, .055) 0 2px, transparent 2px 8px);
+}
+.disc__ph-k {
+  position: absolute; top: 24px; left: 0; right: 0;
+  font-style: normal; font-family: var(--u-font-tech); font-size: 7.5px; letter-spacing: .3em; opacity: .72;
+}
+.disc__ph-t {
+  font-family: "Kaiti SC", KaiTi, STKaiti, serif;
+  font-size: 13px; font-weight: 700; line-height: 1.25;
+  max-width: 100%;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, .7);
+}
+.disc__ph-y { font-style: normal; font-family: var(--u-font-tech); font-size: 8.5px; letter-spacing: .26em; opacity: .72; }
 /* 盘芯孔 */
 .disc__hole {
   position: absolute; left: 50%; top: 50%;
@@ -238,6 +309,19 @@ function onUntilt() {
   -webkit-background-clip: text; background-clip: text;
 }
 .stars__num { font-size: 11px; font-weight: 700; color: var(--u-text-2); margin-left: 4px; }
+
+/* ---------- 观众 vs 媒体 对比条 ---------- */
+.cmp { width: 100%; max-width: 250px; margin: 2px auto 10px; display: flex; flex-direction: column; gap: 5px; }
+.cmp__row { display: grid; grid-template-columns: 28px 1fr 26px; align-items: center; gap: 8px; }
+.cmp__k { font-family: var(--u-font-tech); font-size: 8.5px; letter-spacing: .12em; color: var(--u-text-2); }
+.cmp__bar { height: 6px; border-radius: 3px; background: rgba(120, 90, 50, .1); overflow: hidden; }
+.cmp__bar i {
+  display: block; height: 100%; border-radius: 3px;
+  background: linear-gradient(90deg, rgba(15, 118, 110, .45), var(--u-orange));
+  transition: width .9s cubic-bezier(.16, .84, .44, 1);
+}
+.cmp__bar--media i { background: linear-gradient(90deg, rgba(166, 124, 46, .5), var(--u-gold)); }
+.cmp__v { font-family: var(--u-font-tech); font-size: 10px; font-weight: 700; color: var(--u-text); text-align: right; }
 
 /* ---------- 分化指数 ---------- */
 .divind {
@@ -302,9 +386,17 @@ function onUntilt() {
 }
 .idx__d:hover { transform: translateY(-3px); }
 .idx__d.on { border-color: var(--u-orange); transform: translateY(-3px) scale(1.06); }
+.idx__img {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  display: block;
+}
 .idx__no {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-  font-family: "Kaiti SC", KaiTi, serif; font-size: 13px; font-weight: 700; color: #4A2E16;
+  font-family: "Kaiti SC", KaiTi, serif; font-size: 13px; font-weight: 700;
+  color: #FBF3E4; text-shadow: 0 1px 6px rgba(0, 0, 0, .5);
 }
 
 /* 切换交叉淡入 */

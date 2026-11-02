@@ -243,7 +243,7 @@ const words = computed(() => {
   gap: 8px;
   font-size: 11.5px;
 }
-.echo__w-zh { color: #E8ECF3; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.echo__w-zh { color: var(--u-text); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .echo__w-bar { height: 4px; background: rgba(120, 90, 50, 0.06); clip-path: polygon(2px 0, 100% 0, calc(100% - 2px) 100%, 0 100%); }
 .echo__w-bar i {
   display: block;

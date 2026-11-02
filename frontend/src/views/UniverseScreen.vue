@@ -7,11 +7,18 @@
     不做纵向长网页。100vh 一屏、零滚动条，全部真实数据（ES 聚合）。
 
     两层：
-      大厅（默认）：手绘影院外墙，六扇门 = 六个分类，推门进展厅（itomdev.com 式房间导航）
-      展厅：顶部馆内导览（回大厅/串门/门牌直达）+ 中央图表 + 左翼 + 右翼 + 底部真实影评流
+      大厅（默认）：手绘影院外墙，五扇门 = 五个分类，推门进展厅（itomdev.com 式房间导航）
+      展厅：顶部馆内导览（回大厅/门牌直达）+ 中央图表 + 左翼 + 右翼 + 底部真实影评流
     ============================================================
   -->
-  <div ref="root" class="dashboard-container">
+  <div ref="root" class="dashboard-container" :class="{ 'is-room': mode === 'room', 'is-scroll': isScroll }">
+
+    <!-- ========== 背景：电影海报墙（仅数据展厅；星图厅自带 3D 星系背景） ========== -->
+    <MovieBackdrop v-if="isScroll" :movies="movies" />
+    <!-- 鼠标暖光：跟随指针的柔光，给长页一点"活"的感觉（A24 式） -->
+    <div v-if="isScroll" class="room-spotlight" aria-hidden="true" />
+    <!-- 长页滚动进度：顶栏下沿一条金色细线 -->
+    <div v-if="isScroll" class="room-progress" aria-hidden="true"><i /></div>
 
     <!-- ========== 底层：3D 粒子星系（图表模式下压暗不卸载） ========== -->
     <div class="three-canvas-layer" :class="{ 'is-dim': mode !== 'room' || view !== 'galaxy' }">
@@ -21,11 +28,12 @@
       <GalaxyStage :movies="movies" :paused="hudHover || mode !== 'room' || view !== 'galaxy'" />
     </div>
 
-    <!-- ========== 大厅层：六扇门，推门进入对应展厅（itomdev.com 式房间导航） ========== -->
+    <!-- ========== 大厅层：A24 编辑式首页，六间展厅作章节索引（推门进入对应展厅） ========== -->
     <InsightHouse
       v-if="mode === 'house'"
       class="house-layer"
       :rooms="VIEWS"
+      :cards="story?.cards || []"
       @enter="enterRoom"
     />
 
@@ -42,11 +50,14 @@
         <div class="top-bar__meta">
           <span>影评 <b class="top-bar__num"><RollingNumber :value="reviewTotal" :duration="2000" /></b> 条</span>
           <span>影片 <b class="top-bar__num"><RollingNumber :value="movieTotal" :duration="1800" /></b> 部</span>
-          <span>星图采样 <b class="top-bar__num"><RollingNumber :value="movies.length" :duration="1600" /></b> 部</span>
           <span class="top-bar__live"><i class="top-bar__dot" />实时</span>
         </div>
         <button class="top-bar__btn" type="button" @click="toggleFs">⛶ 全屏</button>
       </header>
+
+      <!-- 房间模式：回大厅入口钉在页面左上角（与右上角导览图按钮对称）；
+           高对比实底渐变 + 手绘抖边硬阴影，保证暖白纸上绝不会看不见 -->
+      <button v-show="mode === 'room'" class="room-nav__back" type="button" @click="backToHouse">← 回大厅</button>
 
       <!-- 大厅模式：悬浮导览图按钮（itomdev 汉堡钮位，常驻可见，不会进展厅就找不到北） -->
       <button v-show="mode === 'house'" class="house-map-btn" type="button" @click="mapOpen = true">
@@ -59,10 +70,9 @@
            星系视图只显示标签、不显示图表面板；切到图表视图再展开面板 -->
       <!-- 馆内导览：回大厅 / 当前展厅门牌 / 串门 / 六扇门直达
            （原 16s 自动轮播停用：房间是"走进去"的，不该自己换房） -->
-      <div v-show="mode === 'room'" class="stage-dock" @pointerenter="hudHover = true" @pointerleave="hudHover = false">
+      <div v-show="mode === 'room'" class="stage-dock" :class="{ 'is-wide': !curView.left.length && !curView.right.length }" @pointerenter="hudHover = true" @pointerleave="hudHover = false">
         <div class="room-nav">
-          <!-- ★ 返回入口（用户三次反馈"看不到返回按钮"）：大号高对比 pill + 导览图圆钮双保险 -->
-          <button class="room-nav__back" type="button" @click="backToHouse">← 回大厅</button>
+          <!-- 回大厅按钮已移到页面左上角（见下方 .room-nav__back），此处仅留导览图 + 门牌 -->
           <button class="room-nav__map" type="button" aria-label="打开导览图" title="导览图" @click="mapOpen = true">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14" /></svg>
           </button>
@@ -70,166 +80,46 @@
           <div class="room-nav__plate">
             <i class="room-nav__icon">{{ curView.icon }}</i>
             <b>{{ curView.zh }}</b>
-            <span>独立展厅 · 仅本门数据</span>
           </div>
           <!-- 每个展厅相互独立：进展厅后只保留「回大厅」出口，不提供串门 / 门牌直达，
                避免在一个门里跳转到其他门的数据（用户 2026-10-22 要求做分离）；
                换展厅请走「回大厅」或导览图 -->
         </div>
-        <div v-show="view !== 'galaxy'" class="stage-panel">
+        <!-- 星图厅：3D 星系在底层透出，这里只放一张悬浮读图卡 + 右上情感分布卡 -->
+        <GalaxyRoom
+          v-if="view === 'galaxy'"
+          :avg-rating="avgRating"
+          :arm-count="armCount"
+          :sentiment="sentiment"
+          :lexicon="lexicon"
+          :stats="galaxyStats"
+        />
+
+        <!-- 其余展厅：每间各自一套排版（专属舞台组件），玻璃面板仅作承托 -->
+        <div v-else class="stage-panel" :class="{ 'stage-panel--bare': view !== 'box' }">
           <div class="stage-panel__inner">
             <Transition name="stage-fade" mode="out-in">
-              <BoxOfficeGallery
+              <BoxOfficeStage
                 v-if="view === 'box'"
                 :gallery="boxOffice?.gallery || []"
                 :total-movies="boxOffice?.total_movies || 0"
                 :total-revenue="boxOffice?.total_revenue || 0"
                 :top-year="boxOffice?.top_year"
+                :years="boxOffice?.years || []"
                 :pick="boxPick"
-              />
-              <BumpChart v-else-if="view === 'rank'" :matrix="matrix" />
-              <SankeyFlow v-else-if="view === 'flow'" :matrix="matrix" />
-              <DivergenceChart v-else-if="view === 'diverge'" :divergence="douban?.rating_divergence || []" />
-              <GlobeMapPanel v-else-if="view === 'globe'" :points="mapPoints" @select="onMapSelect" />
-            </Transition>
-          </div>
-        </div>
-      </div>
-
-      <!-- ---- 03 左翼：回声廊 / 词典词云 ---- -->
-      <section
-        v-show="mode === 'room'"
-        class="left-panel hud-panel"
-        @pointerenter="hudHover = true"
-        @pointerleave="hudHover = false"
-      >
-        <div class="hud-panel__body">
-          <i class="hud-panel__scan" />
-          <div class="hud-title">
-            <i class="hud-title__bar" />
-            <span class="hud-title__zh">{{ panelMeta[leftTab].zh }}</span>
-            <span class="hud-title__en">{{ panelMeta[leftTab].en }}</span>
-            <i class="hud-title__line" />
-          </div>
-          <div class="panel-tabs">
-            <button
-              v-for="t in curView.left"
-              :key="t"
-              class="panel-tab"
-              :class="{ 'is-on': leftTab === t }"
-              type="button"
-              @click="leftTab = t"
-            >{{ panelMeta[t].tab }}</button>
-          </div>
-          <div class="panel-scroll">
-            <Transition name="stage-fade" mode="out-in">
-              <EchoChamber v-if="leftTab === 'echo'" :sentiment="sentiment" :lexicon="lexicon" />
-              <WordCloudCard v-else-if="leftTab === 'cloud'" :lexicon="lexicon" />
-              <DoubanPanel v-else-if="leftTab === 'douban'" :douban="douban" />
-              <BoxOfficeRank
-                v-else-if="leftTab === 'boxrank'"
-                :gallery="boxOffice?.gallery || []"
-                :total-movies="boxOffice?.total_movies || 0"
                 @pick="boxPick = $event"
               />
-            </Transition>
-          </div>
-        </div>
-      </section>
-
-      <!-- ---- 04 右翼：叙事时间轴 / 类型口碑榜 ---- -->
-      <section
-        v-show="mode === 'room'"
-        class="right-panel hud-panel"
-        @pointerenter="hudHover = true"
-        @pointerleave="hudHover = false"
-      >
-        <div class="hud-panel__body">
-          <i class="hud-panel__scan" />
-          <div class="hud-title">
-            <i class="hud-title__bar" />
-            <span class="hud-title__zh">{{ panelMeta[rightTab].zh }}</span>
-            <span class="hud-title__en">{{ panelMeta[rightTab].en }}</span>
-            <i class="hud-title__line" />
-          </div>
-          <div class="panel-tabs">
-            <button
-              v-for="t in curView.right"
-              :key="t"
-              class="panel-tab"
-              :class="{ 'is-on': rightTab === t }"
-              type="button"
-              @click="rightTab = t"
-            >{{ panelMeta[t].tab }}</button>
-          </div>
-          <div class="panel-scroll">
-            <Transition name="stage-fade" mode="out-in">
-              <StoryTimeline v-if="rightTab === 'story'" :trends="trends" />
-              <GenreRankCard v-else-if="rightTab === 'rank'" :by-genre="sentiment?.by_genre || []" />
-              <CoveragePanel v-else-if="rightTab === 'coverage'" :douban="douban" />
-              <BoxOfficeTrend
-                v-else-if="rightTab === 'boxtrend'"
-                :years="boxOffice?.years || []"
-                :total-revenue="boxOffice?.total_revenue || 0"
-                :total-movies="boxOffice?.total_movies || 0"
+              <RankRoom v-else-if="view === 'rank'" :matrix="matrix" :douban="douban" :sentiment="sentiment" />
+              <FlowRoom v-else-if="view === 'flow'" :matrix="matrix" :trends="trends" :regions="regions" :douban="douban" />
+              <DivergeRoom
+                v-else-if="view === 'diverge'"
+                :divergence="douban?.rating_divergence || []"
+                :polarizing="polarizing"
+                :douban="douban"
               />
-              <PolarizingBoard v-else-if="rightTab === 'polarize'" :polarizing="polarizing" />
-              <RegionsPanel v-else-if="rightTab === 'regions'" :regions="regions" />
             </Transition>
           </div>
         </div>
-      </section>
-
-      <!-- ---- 05 星系读图指南（galaxy 视图专属：用户反馈"看不懂星系在表达什么"） ---- -->
-      <div
-        v-if="mode === 'room' && view === 'galaxy'"
-        class="galaxy-legend"
-        @pointerenter="hudHover = true"
-        @pointerleave="hudHover = false"
-      >
-        <div class="galaxy-legend__head">📖 怎么读这张星图<i>每颗星 = 一部真实影片</i></div>
-        <div class="galaxy-legend__row">
-          <span class="gl-item"><i class="gl-item__bar" />颜色 = 影片口碑</span>
-          <span class="gl-item">星星越大 = 讨论越热</span>
-          <span class="gl-item">越靠核心 = 越热门</span>
-          <span class="gl-item">每条旋臂 = 一个电影类型</span>
-        </div>
-        <div class="galaxy-legend__stats">
-          采样 {{ movies.length }} 部 · 均分 {{ avgRating.toFixed(1) }} · {{ armCount }} 条类型旋臂 · 悬停任意星星查看影片详情
-        </div>
-      </div>
-
-      <!-- ---- 05b 取景地图图例 / 地点影片卡（globe 视图，同一槽位切换） ---- -->
-      <div v-else-if="mode === 'room' && view === 'globe' && !loc" class="globe-hud">
-        <span><i class="globe-hud__dot globe-hud__dot--film" />拍摄地</span>
-        <span><i class="globe-hud__dot globe-hud__dot--story" />故事发生地</span>
-        <span>脉冲环 = 影片数最多的取景地</span>
-        <span class="globe-hud__hint">拖动旋转 · 滚轮缩放 · 点击光点看当地影片</span>
-      </div>
-      <div v-else-if="mode === 'room' && view === 'globe' && loc" class="loc-card">
-        <div class="loc-card__head">
-          <b>{{ loc.name }}</b>
-          <span>{{ loc.kind === 'filming' ? '拍摄地' : '故事发生地' }} · {{ loc.movies }} 部影片</span>
-          <button type="button" title="关闭" @click="loc = null">✕</button>
-        </div>
-        <div class="loc-card__body">
-          <span v-if="locLoading" class="loc-card__tip">加载中…</span>
-          <template v-else-if="locMovies.length">
-            <button
-              v-for="mv in locMovies"
-              :key="mv.movie_id"
-              type="button"
-              class="loc-card__movie"
-              @click="$router.push(`/movie/${mv.movie_id}`)"
-            >{{ mv.title_zh || mv.title || mv.movie_id }}</button>
-          </template>
-          <span v-else class="loc-card__tip">暂无关联影片</span>
-        </div>
-      </div>
-
-      <!-- ---- 05c 中央悬浮提示条（图表视图） ---- -->
-      <div v-else-if="mode === 'room'" class="center-hud">
-        <i />{{ centerHint }}
       </div>
 
       <!-- ---- 06 底部真实影评流 ---- -->
@@ -240,8 +130,8 @@
         @pointerleave="hudHover = false"
       >
         <div class="bottom-bar__head">
-          <span>◈ 真实影评流</span>
-          <span>· 中文真实影评 · {{ reviews.length }} 条</span>
+          <span>◈ 影评流</span>
+          <span>· 中文影评 · {{ reviews.length }} 条</span>
         </div>
         <div class="bottom-bar__track">
           <!-- 恒速滚动：时长由 JS 按轨道实测宽度反推（streamDur），内容增减速度不变 -->
@@ -258,8 +148,7 @@
 
     </div>
 
-    <!-- 大厅 · 馆长洞察卡叠（A24 编辑卡，点卡直达展厅；浮在 3D 场景之上） -->
-    <HallInsights v-if="mode === 'house'" :cards="story?.cards || []" @enter="enterRoom" />
+    <!-- 馆长洞察卡已收编进大厅底部（见 InsightHouse 内的 HallInsights），此处不再单独渲染 -->
 
     <!-- 手绘导览图（itomdev MAP 面板）：大厅=传送地图，展厅=当前位置 + 回大厅 -->
     <InsightMap
@@ -278,38 +167,28 @@
 // ============================================================
 // 影评洞察大屏 /screen（用户定调：洞察页 = 数据分析大屏本体）
 //   · 数据：sentiment / trends / matrix / boxOffice / lexicon / movies / reviews /
-//     mapPoints，全部真实接口（matrix = ES 类型×年代聚合；boxOffice = ES 票房
-//     聚合 + TOP 影片，2026-10-22 起替代原「类型竞赛」展厅；
-//     mapPoints = /fun/map，Wikidata 拍摄地坐标，3D 地球数据源）
+//     全部真实接口（matrix = ES 类型×年代聚合；boxOffice = ES 票房
+//     聚合 + TOP 影片，2026-10-22 起替代原「类型竞赛」展厅）
 //   · 视图：星图（3D 粒子，悬停可读单部影片）/ 票房（itomdev 式相框绳画廊）/
-//     排名（口碑变化）/ 流向（桑基）/ 分歧（豆瓣对比）/ 地图（3D 地球取景地）
+//     排名（口碑变化）/ 流向（桑基）/ 分歧（豆瓣对比）
 //   · 3D 层切走时只压暗不卸载：反复销毁 WebGL context 会掉显存
-//   · globe.gl 体积大：取景地图视图用 defineAsyncComponent 懒加载，进视图才下载
 // ============================================================
-import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import gsap from 'gsap'
 import { api } from '../api'
 import GalaxyStage from '../components/screen/GalaxyStage.vue'
-import BoxOfficeGallery from '../components/screen/BoxOfficeGallery.vue'
-import BoxOfficeRank from '../components/screen/BoxOfficeRank.vue'
-import BoxOfficeTrend from '../components/screen/BoxOfficeTrend.vue'
-import BumpChart from '../components/screen/BumpChart.vue'
-import SankeyFlow from '../components/screen/SankeyFlow.vue'
+import BoxOfficeStage from '../components/screen/BoxOfficeStage.vue'
+import GalaxyRoom from '../components/screen/GalaxyRoom.vue'
+import RankRoom from '../components/screen/RankRoom.vue'
+import FlowRoom from '../components/screen/FlowRoom.vue'
+import DivergeRoom from '../components/screen/DivergeRoom.vue'
 import EchoChamber from '../components/screen/EchoChamber.vue'
-import WordCloudCard from '../components/screen/WordCloudCard.vue'
-import StoryTimeline from '../components/screen/StoryTimeline.vue'
 import GenreRankCard from '../components/screen/GenreRankCard.vue'
-import DivergenceChart from '../components/screen/DivergenceChart.vue'
-import DoubanPanel from '../components/screen/DoubanPanel.vue'
 import CoveragePanel from '../components/screen/CoveragePanel.vue'
 import RollingNumber from '../components/screen/RollingNumber.vue'
 import InsightHouse from '../components/screen/InsightHouse.vue'
 import InsightMap from '../components/screen/InsightMap.vue'
-import HallInsights from '../components/screen/HallInsights.vue'
-import PolarizingBoard from '../components/screen/PolarizingBoard.vue'
-import RegionsPanel from '../components/screen/RegionsPanel.vue'
-// 取景地地球散点面板（重建版，迁入 screen 目录）
-const GlobeMapPanel = defineAsyncComponent(() => import('../components/screen/GlobeMapPanel.vue'))
+import MovieBackdrop from '../components/screen/MovieBackdrop.vue'
 
 const root = ref(null)
 const hudHover = ref(false)
@@ -322,7 +201,6 @@ const boxOffice = ref(null)  // 票房分析（/insights/box-office）
 const boxPick = ref(null)    // 左翼票房榜点选 → 中央画廊打开同一部档案
 const lexicon = ref(null)
 const reviews = ref([])
-const mapPoints = ref([])   // 取景地坐标（/fun/map）
 const douban = ref(null)    // 豆瓣联合洞察（/douban/insights，并入本大屏）
 const story = ref(null)        // 大厅馆长洞察卡（/insights/story）
 const polarizing = ref(null)   // 观众评分分化榜（/insights/polarizing）
@@ -344,43 +222,46 @@ const armCount = computed(() => {
   }
   return Math.min(6, c.size)
 })
+/* 星图速览卡：与 GalaxyStage 同口径，但额外给出「最多类型」便于填掉左侧空白 */
+const galaxyStats = computed(() => {
+  const ms = movies.value
+  const c = new Map()
+  for (const m of ms) {
+    const g = (m.genres_zh || [])[0] || '其他'
+    c.set(g, (c.get(g) || 0) + 1)
+  }
+  const top = [...c.entries()].sort((a, b) => b[1] - a[1])[0]
+  return {
+    count: ms.length,
+    avg: avgRating.value,
+    arms: armCount.value,
+    topGenre: top ? top[0] : '—',
+    topCount: top ? top[1] : 0,
+  }
+})
 
 /* ---------- 视图切换（含 16s 自动轮播） ---------- */
 // 命名原则（用户 2026-10-19）：从用户视角说清"这是做什么的"，不用抽象词
-/* ---------- 房间（展厅）与大厅 ----------
-   itomdev.com 的房间式导航：大屏的六个分类 = 六扇门，推开就是一间展厅。
+/* 房间（展厅）与大厅
+   itomdev.com 的房间式导航：大屏的五个分类 = 五扇门，推开就是一间展厅。
    glow = 门缝里透出的展厅光，desc = 门牌提示（悬停时显示在底部条）。
-   left / right = 这间展厅两翼的配套数据面板（与中央图表同主题，避免每间房都摆同一套）。
-   每个面板 key 对应一个已实现的子组件（见 panelMeta）。 */
+   每间展厅各自一套排版（见下方 <Transition> 的专属舞台组件），不再共用"左中右三块"。 */
+/* 五间展厅：每间各自一套排版（不再共用"左中右三块"）。
+   left / right 全部清空 —— 旧的两翼面板已废弃，各房改用专属舞台组件
+   （见下方 <Transition> 的 GalaxyRoom / RankRoom / FlowRoom / DivergeRoom）。 */
 const VIEWS = [
   { key: 'galaxy', zh: '口碑星图', icon: '🌌', desc: '每颗星是一部影片，越亮越热', glow: '#3B2F63', tint: '#6D28D9',
-    left: ['echo'], right: ['story'] },
+    left: [], right: [] },
   { key: 'box', zh: '票房分析', icon: '🎬', desc: '全球票房 TOP 挂在绳上，点框看档案', glow: '#8B4513', tint: '#C2410C',
-    left: ['boxrank'], right: ['boxtrend'] },
+    left: [], right: [] },
   { key: 'rank', zh: '口碑排名', icon: '📈', desc: '各类型口碑位次变化', glow: '#A0522D', tint: '#B45309',
-    left: ['douban'], right: ['rank'] },
+    left: [], right: [] },
   { key: 'flow', zh: '年代流向', icon: '🌊', desc: '类型与年代之间的影片流向', glow: '#0F766E', tint: '#0F766E',
-    left: ['story'], right: ['regions', 'coverage'] },
-  { key: 'diverge', zh: '口碑分歧', icon: '⚖️', desc: '豆瓣评分与本站情感的分歧', glow: '#7D3C1E', tint: '#A67C2E',
-    left: ['douban'], right: ['polarize', 'echo'] },
-  { key: 'globe', zh: '取景地图', icon: '🌍', desc: '全球取景地分布，可点光点看影片', glow: '#1E4E6B', tint: '#2563EB',
-    left: ['coverage'], right: ['story'] },
+    left: [], right: [] },
+  { key: 'diverge', zh: '口碑分歧', icon: '⚖️', desc: '豆瓣评分和这里的口碑，不一定一致', glow: '#7D3C1E', tint: '#A67C2E',
+    left: [], right: [] },
 ]
 
-/* 六个配套面板：标题 / 副题 / 标签名 / 对应组件。
-   两翼面板不再写死成"回声廊+叙事轴"一套，而是按当前展厅取 curView.left/right。 */
-const panelMeta = {
-  echo:    { zh: '跨文化回声廊', en: '情感分布 · 归纳词典', tab: '情感分布', comp: 'EchoChamber' },
-  cloud:   { zh: '高频词云',     en: '归纳词典词频',       tab: '高频词云', comp: 'WordCloudCard' },
-  douban:  { zh: '豆瓣口碑',     en: '评分分歧 · 高分榜',   tab: '豆瓣口碑', comp: 'DoubanPanel' },
-  story:   { zh: '叙事时间轴',   en: '年代影片叙事',       tab: '年代故事', comp: 'StoryTimeline' },
-  rank:    { zh: '类型口碑榜',   en: '各类型口碑评分',     tab: '类型口碑', comp: 'GenreRankCard' },
-  coverage:{ zh: '预告覆盖',     en: '高分片预告触达',     tab: '预告覆盖', comp: 'CoveragePanel' },
-  boxrank: { zh: '全球票房榜',   en: 'TOP 10', tab: '票房榜',   comp: 'BoxOfficeRank' },
-  boxtrend:{ zh: '年度票房',     en: '上映年合计 · 亿美元', tab: '年度趋势', comp: 'BoxOfficeTrend' },
-  polarize:{ zh: '观众评分分化榜', en: '同一部片的满分与最低分', tab: '分化榜', comp: 'PolarizingBoard' },
-  regions: { zh: '国家 / 地区',  en: '产量 × 口碑 气泡图',   tab: '地区画像', comp: 'RegionsPanel' },
-}
 const view = ref('galaxy')
 
 /* house = 大厅（六扇门）；room = 展厅（图表 + 两翼面板）。
@@ -389,14 +270,26 @@ const mode = ref('house')
 const roomIdx = computed(() => Math.max(0, VIEWS.findIndex((v) => v.key === view.value)))
 const curView = computed(() => VIEWS[roomIdx.value] || VIEWS[0])
 
+/* 数据展厅 = 可纵向滚动的长页（用户 2026-11-02："数据页面可以加长，不用固定页面大小"）。
+   星图厅是 3D 全景，保持一屏不滚；大厅也保持一屏。 */
+const isScroll = computed(() => mode.value === 'room' && view.value !== 'galaxy')
+
+/* 切房/回大厅时把滚动位置归零，避免带着上一间展厅的滚动偏移进来 */
+function resetScroll() {
+  nextTick(() => {
+    if (root.value) root.value.scrollTop = 0
+  })
+}
+
 function enterRoom(key) {
   view.value = key
   mode.value = 'room'
-  syncTabs()
+  resetScroll()
   playRoomIntro()
 }
 function backToHouse() {
   mode.value = 'house'
+  resetScroll()
 }
 /* 导览图（itomdev MAP 面板）：大厅模式点房间=传送进门；展厅模式只回大厅 */
 const mapOpen = ref(false)
@@ -408,43 +301,14 @@ function onMapBack() {
   mapOpen.value = false
   backToHouse()
 }
-/* 切房间时，把两翼标签复位到该房间声明的第一组面板
-   （若该房间不含当前标签才重置，减少不必要的切换动画） */
-function syncTabs() {
-  const v = curView.value
-  if (v.left?.length && !v.left.includes(leftTab.value)) leftTab.value = v.left[0]
-  if (v.right?.length && !v.right.includes(rightTab.value)) rightTab.value = v.right[0]
-}
 
 /* 展厅入场：从大厅推门进来，各区块错峰落位（与大厅的推近动画首尾相接） */
 function playRoomIntro() {
   nextTick(() => {
     gsap.from(['.room-nav'], { y: -18, opacity: 0, duration: 0.55, ease: 'power2.out' })
-    gsap.from(['.left-panel'], { x: -34, opacity: 0, duration: 0.65, delay: 0.08, ease: 'power2.out' })
-    gsap.from(['.right-panel'], { x: 34, opacity: 0, duration: 0.65, delay: 0.16, ease: 'power2.out' })
+    gsap.from(['.stage-panel'], { y: 20, opacity: 0, duration: 0.6, delay: 0.08, ease: 'power2.out' })
     gsap.from(['.bottom-bar'], { y: 30, opacity: 0, duration: 0.6, delay: 0.24, ease: 'power2.out' })
   })
-}
-
-const centerHint = computed(() => `${curView.value.zh} · ${curView.value.desc} · 顶部可串门或回大厅`)
-
-/* ---------- 左右面板小切换 ---------- */
-const leftTab = ref('echo')
-const rightTab = ref('story')
-
-/* ---------- 取景地图：点击光点 → 当地影片卡 ---------- */
-const loc = ref(null)
-const locLoading = ref(false)
-const locMovies = ref([])
-async function onMapSelect(l) {
-  loc.value = l
-  locLoading.value = true
-  locMovies.value = []
-  try {
-    const d = await api.mapMovies(l.name, 8)
-    locMovies.value = d?.hits || []
-  } catch { /* 接口失败时保留空列表，不影响地球交互 */ }
-  locLoading.value = false
 }
 
 /* 两遍拼接实现无缝循环（内容相同，位移 -50% 时视觉无跳变） */
@@ -489,9 +353,36 @@ function cjkRatio(text) {
   return n / t.length
 }
 
+/* ---------- 展厅动效：鼠标暖光跟随 + 滚动视差变量 ---------- */
+let spotRaf = 0
+function onSpotMove(e) {
+  if (spotRaf) return
+  spotRaf = requestAnimationFrame(() => {
+    spotRaf = 0
+    const el = root.value
+    if (!el || !isScroll.value) return
+    el.style.setProperty('--mx', `${e.clientX}px`)
+    el.style.setProperty('--my', `${e.clientY}px`)
+  })
+}
+function onRoomScroll() {
+  const el = root.value
+  if (!el) return
+  el.style.setProperty('--u-scroll', String(el.scrollTop))
+  const max = el.scrollHeight - el.clientHeight
+  el.style.setProperty('--u-progress', max > 0 ? String(Math.min(1, el.scrollTop / max)) : '0')
+}
+function bindRoomMotion() {
+  const el = root.value
+  if (!el) return
+  el.addEventListener('pointermove', onSpotMove, { passive: true })
+  el.addEventListener('scroll', onRoomScroll, { passive: true })
+}
+
 onMounted(async () => {
   document.body.classList.add('u-body-lock')
   document.documentElement.classList.add('u-body-lock')
+  bindRoomMotion()
   // 大厅模式：只落顶栏（两翼/底带属于展厅，等推门时再由 playRoomIntro 落位）
   gsap.from(['.top-bar'], { y: -26, opacity: 0, duration: 0.7, ease: 'power2.out' })
 
@@ -500,7 +391,6 @@ onMounted(async () => {
   if (q && VIEWS.some((v) => v.key === q)) {
     view.value = q
     mode.value = 'room'
-    syncTabs()
     playRoomIntro()
   }
 
@@ -528,8 +418,6 @@ onMounted(async () => {
   // 票房分析（2026-10-22：替代原「类型竞赛」展厅）
   api.boxOffice(24).then((d) => { boxOffice.value = d }).catch(() => {})
   api.lexicon(40).then((d) => { lexicon.value = d }).catch(() => {})
-  // 取景地坐标（3D 地球数据源，Wikidata）
-  api.map().then((d) => { mapPoints.value = d?.points || [] }).catch(() => {})
   // 豆瓣联合洞察（评分分歧 / 情感 / 高分 / 预告覆盖 / 类型情感）—— 并入本大屏
   api.doubanInsights().then((d) => { douban.value = d }).catch(() => {})
   // 馆长洞察卡 + 评分分化榜 + 地区画像（2026-11-01 新增分析展厅数据源）
@@ -561,6 +449,12 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   document.body.classList.remove('u-body-lock')
   document.documentElement.classList.remove('u-body-lock')
+  const el = root.value
+  if (el) {
+    el.removeEventListener('pointermove', onSpotMove)
+    el.removeEventListener('scroll', onRoomScroll)
+  }
+  if (spotRaf) cancelAnimationFrame(spotRaf)
 })
 
 function toggleFs() {
@@ -581,7 +475,7 @@ function toggleFs() {
   flex: none;
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
   /* 允许换行：屏幕变窄时导览条会被挤出舞台区（stage-dock 左右各让 388px） */
   flex-wrap: wrap;
   row-gap: 6px;
@@ -605,20 +499,17 @@ function toggleFs() {
 }
 .room-nav button:hover { background: #8B4513; color: #FFF6E9; transform: translateY(-1px); }
 
-/* ★ 返回按钮：暖白纸面上必须高对比，否则看不见（用户反馈"进展厅没返回按钮"实为白底白字） */
-.room-nav .room-nav__back {
-  padding: 7px 16px;
-  font-size: 13px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  color: #FFF6E9;
-  background: linear-gradient(160deg, #A0522D, #8B4513);
-  border: 1.4px solid rgba(255, 246, 233, 0.55);
-  box-shadow: 0 3px 10px rgba(139, 69, 19, 0.38);
-}
-/* ★ 返回按钮：大号 + 高对比 + 手绘抖边硬阴影（暖白纸上绝不可能看不见；
-   用户 2026-10-22 第三次反馈"看不到返回按钮"→ 尺寸/边框/阴影全线加强） */
-.room-nav .room-nav__back {
+/* ★ 回大厅按钮：钉在页面左上角（与右上角导览图钮对称）。
+   暖白纸面上必须高对比 / 大号 / 手绘抖边硬阴影，否则用户会"看不见返回按钮"。 */
+.room-nav__back {
+  position: absolute;
+  top: 84px;
+  left: 24px;
+  z-index: 45;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
   padding: 10px 22px;
   font-size: 15px;
   font-weight: 800;
@@ -630,15 +521,18 @@ function toggleFs() {
   box-shadow: 0 3px 10px rgba(139, 69, 19, 0.38), 4px 4px 0 rgba(74, 40, 20, 0.3);
   transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.2s ease;
 }
-.room-nav .room-nav__back:hover {
+.room-nav__back:hover {
   background: linear-gradient(160deg, #B5651D, #A0522D);
   color: #FFF6E9;
   transform: translate(2px, 2px);
   box-shadow: 0 2px 6px rgba(139, 69, 19, 0.38), 1px 1px 0 rgba(74, 40, 20, 0.35);
 }
-.room-nav .room-nav__back:active {
+.room-nav__back:active {
   transform: translate(4px, 4px);
   box-shadow: 0 1px 3px rgba(139, 69, 19, 0.38);
+}
+@media (max-width: 900px) {
+  .room-nav__back { top: 78px; left: 14px; padding: 8px 16px; font-size: 13px; }
 }
 
 /* 导览图圆钮（手绘纸质小圆牌，itomdev nav-btn 位） */
@@ -674,7 +568,8 @@ function toggleFs() {
 .house-map-btn {
   position: absolute;
   top: 84px;
-  left: 24px;
+  left: auto;
+  right: 24px;
   z-index: 40;
   display: inline-flex;
   align-items: center;
@@ -706,7 +601,7 @@ function toggleFs() {
   box-shadow: 0 2px 8px rgba(139, 69, 19, 0.34), 1px 1px 0 rgba(74, 40, 20, 0.32);
 }
 @media (max-width: 900px) {
-  .house-map-btn { top: 78px; left: 14px; padding: 8px 14px 8px 11px; font-size: 12.5px; }
+  .house-map-btn { top: 78px; left: auto; right: 14px; padding: 8px 14px 8px 11px; font-size: 12.5px; }
 }
 
 .room-nav__plate { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; }
@@ -741,20 +636,42 @@ function toggleFs() {
   .room-nav__plate span, .room-nav__go { display: none; }
 }
 
-/* GlobeMapPanel 原为 /analytics 编写，复用 space.css 的变量名；
-   这里把 --sp-* 映射到大屏色板，子组件内的 var() 沿继承链自动解析 */
-.dashboard-container {
-  --sp-cyan: var(--u-orange);
-  --sp-gold: var(--u-gold);
-  --sp-text-2: var(--u-text-2);
-  --sp-font-tech: var(--u-font-tech);
+/* ---------- 鼠标暖光层（跟随指针的柔光，长页滚动时固定不动） ---------- */
+.room-spotlight {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: radial-gradient(
+    340px 340px at var(--mx, 50%) var(--my, 36%),
+    rgba(255, 214, 150, 0.22),
+    rgba(194, 65, 12, 0.07) 45%,
+    transparent 72%
+  );
 }
-/* 地球面板融入大屏舞台：去掉自带深底/切角/内边框（stage-panel 已提供）。
-   2026-10-19 浅色版：舞台是暖白纸，这里给一圈极淡的暖晕衬托球体 */
-:deep(.globe-stage) {
-  min-height: 0;
-  background: radial-gradient(ellipse 120% 90% at 50% 40%, rgba(255, 253, 247, 0.55), rgba(240, 232, 216, 0.3) 62%, transparent);
-  clip-path: none;
+/* 长页滚动进度：顶栏下沿金色细线（scaleX 由 --u-progress 驱动） */
+.room-progress {
+  position: fixed;
+  top: calc(var(--header-h, 60px) + 64px);
+  left: 0;
+  right: 0;
+  height: 3px;
+  z-index: 31;
+  pointer-events: none;
+  background: rgba(139, 69, 19, 0.1);
 }
-:deep(.globe-stage::before) { display: none; }
+.room-progress i {
+  display: block;
+  height: 100%;
+  transform-origin: 0 50%;
+  transform: scaleX(var(--u-progress, 0));
+  background: linear-gradient(90deg, var(--u-gold), var(--u-orange));
+  box-shadow: 0 0 8px rgba(194, 65, 12, 0.5);
+  transition: transform 0.12s linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .room-spotlight { display: none; }
+  .room-progress i { transition: none; }
+}
 </style>

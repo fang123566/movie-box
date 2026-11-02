@@ -102,6 +102,6 @@ const genreOption = computed(() => {
 }
 .cvp__bar { width: 4px; height: 14px; border-radius: 2px; background: var(--u-gold); }
 .cvp__note { margin-left: auto; color: var(--u-gold); font-weight: 700; font-size: 12px; }
-.cvp__chart { height: 130px; }
-.cvp__chart--tall { height: 100%; min-height: 120px; }
+.cvp__chart { height: 108px; }
+.cvp__chart--tall { height: 100%; min-height: 92px; }
 </style>

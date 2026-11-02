@@ -96,7 +96,7 @@ function onMove(e) {
     flipX: x > rect.width - 320,
     flipY: y > rect.height - 140,
     movie: m,
-    note: `热度超过 ${pct}% 的采样影片 · 口碑${r >= avgRating ? '高于' : '低于'}全场均分 ${avgRating.toFixed(1)}`,
+    note: `热度超过 ${pct}% 的影片 · 口碑${r >= avgRating ? '高于' : '低于'}全场均分 ${avgRating.toFixed(1)}`,
   }
 }
 function hideTip() {
@@ -201,8 +201,8 @@ function buildGalaxy() {
     col[i * 3 + 1] = tmp.g
     col[i * 3 + 2] = tmp.b
 
-    // 大小：票数开方（避免头部影片吞掉画面）
-    siz[i] = 1.5 + Math.sqrt((m.votes || 0) / maxVotes) * 6.0
+    // 大小：票数开方（避免头部影片吞掉画面）；整体略放大让星系更有体量
+    siz[i] = 2.0 + Math.sqrt((m.votes || 0) / maxVotes) * 7.0
   })
 
   geo = new THREE.BufferGeometry()
@@ -306,7 +306,7 @@ function makeLabelSprite(main, sub) {
     depthTest: false, depthWrite: false,
   })
   const sp = new THREE.Sprite(m)
-  const h = 7.5 // 世界单位高度（距相机 ~190 时约 44px）
+  const h = 9.5 // 世界单位高度（拉近后略放大，提升旋臂标签可读性）
   sp.scale.set(h * (c.width / c.height), h, 1)
   sp.renderOrder = 10
   return sp
@@ -456,12 +456,15 @@ function buildComets(count = 3) {
 /* 每帧推进彗星：滑窗取点 + percent（0→1→0）写入预分配缓冲 */
 function updateComets(dt) {
   for (const cm of comets) {
-    cm.index = (cm.index + cm.speed * dt) % cm.total
+    const arr = cm.points
+    if (!arr || !arr.length) continue
+    cm.index = (cm.index + cm.speed * dt) % arr.length
     const start = Math.floor(cm.index)
     const pos = cm.geo.attributes.position.array
     const siz = cm.geo.attributes.aSize.array
     for (let i = 0; i < cm.win; i++) {
-      const p = cm.points[(start + i) % cm.total]
+      const p = arr[(start + i) % arr.length]
+      if (!p) continue
       pos[i * 3] = p.x
       pos[i * 3 + 1] = p.y
       pos[i * 3 + 2] = p.z
@@ -520,7 +523,7 @@ onMounted(() => {
 
   scene = new THREE.Scene()
   camera = new THREE.PerspectiveCamera(52, w / h, 0.1, 3000)
-  camera.position.set(0, 52, 190)
+  camera.position.set(0, 46, 160)
 
   controls = new CameraControls(camera, renderer.domElement)
   controls.dampingFactor = 0.07
@@ -529,7 +532,7 @@ onMounted(() => {
   controls.maxDistance = 420
   controls.minPolarAngle = Math.PI * 0.12
   controls.maxPolarAngle = Math.PI * 0.88
-  controls.setLookAt(0, 52, 190, 0, 0, 0, false)
+  controls.setLookAt(0, 46, 160, 0, 0, 0, false)
 
   // 后处理：Bloom(mipmapBlur) + 边缘色散（浅色版去掉暗角——
   // 白纸场景四角逐层压暗像脏污，观感比深色底差得多）
@@ -561,7 +564,7 @@ onMounted(() => {
     blending: THREE.NormalBlending,
     depthWrite: false, transparent: true, opacity: 0.5,
   }))
-  coreGlow.scale.set(46, 46, 1)
+  coreGlow.scale.set(40, 40, 1)
   galaxy.add(coreGlow)
 
   buildDust()

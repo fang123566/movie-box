@@ -63,13 +63,13 @@ const rows = computed(() => {
 .borank__head { display: flex; align-items: baseline; gap: 8px; padding-bottom: 8px; }
 .borank__head-zh { font-size: 13px; font-weight: 800; color: var(--u-text, #3A2E20); letter-spacing: 0.04em; }
 .borank__head-en { font-size: 10px; color: var(--u-text-2, #7D6B52); letter-spacing: 0.06em; }
-.borank__list { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 6px; }
+.borank__list { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 3px; }
 .borank__row {
   display: grid;
-  grid-template-columns: 26px 1fr 62px 44px auto;
+  grid-template-columns: 24px 1fr 58px 42px auto;
   align-items: center;
-  gap: 7px;
-  padding: 5px 7px;
+  gap: 6px;
+  padding: 2px 7px;
   background: rgba(255, 253, 247, 0.72);
   border: 1px solid rgba(139, 107, 71, 0.22);
   border-radius: 9px 4px 10px 4px;

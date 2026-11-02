@@ -464,7 +464,7 @@ body.u-body-lock .app-main > * { flex: 1; min-height: 0; }
 .left-panel,
 .right-panel {
   position: absolute;
-  top: 80px;
+  top: 140px;   /* 下移到「回大厅」按钮之下（按钮钉在左上角 top:82），避免压住面板标题 */
   bottom: 160px;
   width: 340px;
 }
@@ -477,7 +477,9 @@ body.u-body-lock .app-main > * { flex: 1; min-height: 0; }
   bottom: 0;
   left: 0;
   width: 100%;
-  height: 140px;
+  /* 140px → 104px：把纵向空间还给数据房间（缓解"压缩"），
+     仍保留「影评流」标题 + 一行滚动影评。 */
+  height: 104px;
   background: linear-gradient(to top, rgba(255, 253, 247, 0.96), rgba(250, 246, 236, 0.8) 62%, transparent);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
@@ -640,66 +642,6 @@ body.u-body-lock .app-main > * { flex: 1; min-height: 0; }
   font-size: 10px; letter-spacing: 1.2px; color: var(--u-text-2);
 }
 
-/* --- 取景地图图例（globe 视图，未选中地点时） --- */
-.globe-hud {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: 168px;
-  max-width: calc(100vw - 48px);
-  pointer-events: auto;
-  display: flex; align-items: center; flex-wrap: wrap; justify-content: center; gap: 7px 16px;
-  padding: 9px 18px;
-  background: rgba(255, 253, 247, 0.86);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--u-line);
-  clip-path: var(--u-poly);
-  --u-cut: 10px;
-  font-size: 11.5px; color: #4A3C2A;
-}
-.globe-hud span { display: inline-flex; align-items: center; gap: 6px; }
-.globe-hud__dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
-.globe-hud__dot--film { background: #B8860B; box-shadow: 0 0 8px rgba(184, 134, 11, 0.35); }
-.globe-hud__dot--story { background: #0E7490; box-shadow: 0 0 8px rgba(14, 116, 144, 0.3); }
-.globe-hud__hint { color: var(--u-text-2); }
-
-/* --- 地点影片卡（点击地球光点后占同一槽位） --- */
-.loc-card {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: 168px;
-  width: min(520px, calc(100vw - 48px));
-  pointer-events: auto;
-  padding: 12px 16px;
-  background: rgba(255, 253, 247, 0.92);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--u-line-strong);
-  clip-path: var(--u-poly);
-  --u-cut: 12px;
-}
-.loc-card__head { display: flex; align-items: baseline; gap: 10px; }
-.loc-card__head b { font-size: 14px; color: var(--u-orange-deep); letter-spacing: .5px; }
-.loc-card__head span { font-size: 11px; color: var(--u-text-2); }
-.loc-card__head button {
-  margin-left: auto; background: none; border: none; cursor: pointer;
-  color: var(--u-text-2); font-size: 12px; padding: 2px 6px;
-}
-.loc-card__head button:hover { color: var(--u-text); }
-.loc-card__body { margin-top: 9px; display: flex; flex-wrap: wrap; gap: 6px; }
-.loc-card__movie {
-  font-size: 11px; color: #4A3C2A; cursor: pointer;
-  padding: 4px 11px; background: rgba(120, 90, 50, 0.06);
-  border: 1px solid var(--u-line);
-  clip-path: var(--u-poly);
-  --u-cut: 6px;
-  transition: color .2s ease, border-color .2s ease;
-}
-.loc-card__movie:hover { color: var(--u-text); border-color: var(--u-line-strong); }
-.loc-card__tip { font-size: 11px; color: var(--u-text-2); }
-
 /* ============================================================
    5. 面板内占位骨架（下一轮替换为真实图表/3D 内容）
    ============================================================ */
@@ -746,10 +688,15 @@ body.u-body-lock .app-main > * { flex: 1; min-height: 0; }
    ============================================================ */
 .stage-dock {
   position: absolute;
-  left: 388px;   /* 340 面板 + 24 边距 + 24 间隙 */
-  right: 388px;
-  top: 80px;
-  bottom: 160px;
+  /* 左右两翼已废弃（各房改用专属舞台组件），不再留 388px 宽边距——
+     否则数据房间会缩在屏幕中央一条窄带里，四周大片留白（"太空旷"）。
+     这里直接占满中央区，只在边缘留少量呼吸位。 */
+  left: 44px;
+  right: 44px;
+  /* 顶栏 64px + 底部影评流 104px，把中间留给数据房间：
+     900 高屏下房间可得 ~710px（原 660px），缓解"压缩"。 */
+  top: 70px;
+  bottom: 116px;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -817,6 +764,9 @@ body.u-body-lock .app-main > * { flex: 1; min-height: 0; }
 
 /* 图表玻璃面板（浅色版：暖白近实底 + 金橙青渐变边） */
 .stage-panel {
+  /* 必须有定位：::after 扫描光是 absolute + top/bottom:-60%，
+     缺定位父级时会以 .stage-dock 为基准撑出 ~550px 幽灵滚动高度 */
+  position: relative;
   flex: 1;
   min-height: 0;
   display: flex;
@@ -837,8 +787,10 @@ body.u-body-lock .app-main > * { flex: 1; min-height: 0; }
 .stage-panel::after {
   content: '';
   position: absolute;
-  top: -60%;
-  bottom: -60%;
+  /* 只向上溢出（负方向不产生滚动条），不要 bottom:-60%——
+     否则扫描光会把可滚动高度多撑出一截，长页末尾出现大片空白 */
+  top: -20%;
+  bottom: 0;
   width: 22%;
   left: -28%;
   background: linear-gradient(105deg, transparent, rgba(255, 196, 120, 0.12) 45%, rgba(194, 65, 12, 0.09) 50%, transparent);
@@ -854,9 +806,39 @@ body.u-body-lock .app-main > * { flex: 1; min-height: 0; }
 .stage-fade-enter-active, .stage-fade-leave-active { transition: opacity .35s ease; }
 .stage-fade-enter-from, .stage-fade-leave-to { opacity: 0; }
 
-/* 3D 层在图表模式下压暗（保留渲染，不卸载；0.3 仍留星空层次） */
+/* ============================================================
+   6b. 浮动卡片（各展厅异形排版：手绘纸框 + 硬阴影，直接铺在暖白纸面）
+   ------------------------------------------------------------
+   参考 itomdev 的"墙上挂的纸卡" + A24 编辑式副栏：不再是统一玻璃面板，
+   而是每张图 / 每块说明牌各自一张手绘纸卡，错落陈列。
+   ============================================================ */
+.float-card {
+  position: relative;
+  background: linear-gradient(178deg, #FDFBF4 0%, #F7F1E3 60%, #F2EBDD 100%);
+  border: 1.4px solid rgba(139, 69, 19, 0.28);
+  /* 手绘抖边：不规则圆角让卡片像裁切的手工纸 */
+  border-radius: 255px 14px 225px 16px / 16px 225px 16px 255px;
+  box-shadow: 0 12px 28px rgba(120, 90, 50, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  padding: 12px 14px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* 裸面板：票房以外的展厅去掉玻璃背板，让手绘纸卡直接铺在暖白纸面上 */
+.stage-panel--bare {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  clip-path: none;
+}
+.stage-panel--bare::after { display: none; }
+
+/* 3D 层在非星图模式下彻底隐去（仍保留渲染、不卸载，避免反复重建 WebGL 上下文；
+   图表类展厅用透明裸面板，若只压暗到 0.3 会在纸面背后露出星云雾，故直接隐藏） */
 .three-canvas-layer { transition: opacity .5s ease; }
-.three-canvas-layer.is-dim { opacity: 0.3; }
+.three-canvas-layer.is-dim { opacity: 0; }
 
 /* 左右面板内的小切换 tab（回声室 ↔ 词云 / 时间轴 ↔ 口碑榜） */
 .panel-tabs {
@@ -892,12 +874,12 @@ body.u-body-lock .app-main > * { flex: 1; min-height: 0; }
 @media (max-width: 1440px) {
   .left-panel, .right-panel { width: 300px; }
   .top-bar__meta { gap: 12px; font-size: 10px; }
-  .stage-dock { left: 348px; right: 348px; }
+  .stage-dock { left: 36px; right: 36px; }
 }
 @media (max-width: 1180px) {
   .left-panel, .right-panel { width: 264px; }
   .top-bar__sub { display: none; }
-  .stage-dock { left: 312px; right: 312px; }
+  .stage-dock { left: 28px; right: 28px; }
 }
 @media (max-width: 900px) {
   /* 极窄屏：两侧面板收起（大屏本为 16:9 桌面场景），背景 3D 星图作主视觉 */
@@ -906,9 +888,13 @@ body.u-body-lock .app-main > * { flex: 1; min-height: 0; }
      这样窄屏/移动端进展厅后仍有返回入口，不会被整条 .stage-dock 收起而消失 */
   .stage-dock { left: 0; right: 0; top: 72px; bottom: auto; height: auto; }
   .stage-dock .stage-panel { display: none; }
-  /* 读图指南 / 地图图例 / 地点卡随剧场一起隐退，避免压面板 */
-  .galaxy-legend, .globe-hud, .loc-card { display: none; }
+  /* 星图读图卡在窄屏随 3D 一起隐退（它不在 .stage-panel 内，需单独隐藏） */
+  .galaxy-float { display: none; }
 }
+
+/* 全宽展厅（如票房分析：无左右两翼，画廊占满整条舞台）。
+   高于 .stage-dock 基础规则与 1440/1180 媒体查询（多一个类，特异性更高）。 */
+.stage-dock.is-wide { left: 24px; right: 24px; }
 
 /* ============================================================
    7. /analytics 第 07 章的「进入大屏」入口卡
@@ -966,4 +952,147 @@ body.u-body-lock .app-main > * { flex: 1; min-height: 0; }
   .stream-track { animation: none; }
   .canvas-placeholder__core { animation: none; }
   .top-bar__dot { animation: none; }
+}
+
+/* ============================================================
+   8. 展厅模式 · 数据页纵向加长（用户 2026-11-02）
+   ------------------------------------------------------------
+   诉求原话："还是被压缩了，你的数据页面可以加长，不用固定页面大小"。
+   原先本页是"100vh 一屏、零滚动"：.dashboard-container 死高，
+   .stage-dock 绝对定位夹在顶栏与底栏之间，173 部影片的分歧散点
+   被压成一条 ~40px 的细带，榜单也只能露几行。
+
+   这里把「展厅」改成可纵向滚动的长页（大厅 / 星图厅不受影响）：
+     · .is-scroll 容器自身成为滚动容器（body 仍锁滚动，页面只在本容器内滚）
+     · .hud-layer 由绝对覆盖层改为流式容器，高度随内容增长
+     · .stage-dock 取消绝对定位，数据舞台给足最小高度（不再挤一屏）
+     · 底栏影评流落到页面末尾（不再盖住数据）
+     · 左上「回大厅」改为 fixed，滚到任何位置都能一键返回
+   所有选择器都带 .is-scroll 前缀，特异性高于上面 1440/1180/900
+   的媒体查询，窄屏也不会被旧规则改回绝对定位。
+   ============================================================ */
+.dashboard-container.is-scroll {
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(139, 69, 19, 0.32) transparent;
+  scroll-behavior: smooth;
+}
+.dashboard-container.is-scroll::-webkit-scrollbar { width: 10px; }
+.dashboard-container.is-scroll::-webkit-scrollbar-track { background: rgba(139, 69, 19, 0.04); }
+.dashboard-container.is-scroll::-webkit-scrollbar-thumb {
+  background: rgba(139, 69, 19, 0.28);
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.dashboard-container.is-scroll::-webkit-scrollbar-thumb:hover { background: rgba(139, 69, 19, 0.45); background-clip: padding-box; }
+
+/* HUD 层改为流式：高度随数据内容增长，整页滚动 */
+.dashboard-container.is-scroll .hud-layer {
+  position: relative;
+  inset: auto;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 顶栏吸顶：滚动看数据时状态栏始终在 */
+.dashboard-container.is-scroll .top-bar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+}
+
+/* 数据舞台：不再绝对定位夹在上下栏之间，可以比一屏更高 */
+.dashboard-container.is-scroll .stage-dock {
+  position: relative;
+  left: auto;
+  right: auto;
+  top: auto;
+  bottom: auto;
+  width: 100%;
+  max-width: 1720px;
+  margin: 0 auto;
+  padding: 18px 40px 10px;
+  flex: 1 0 auto;
+  height: auto;
+  min-height: 0;
+}
+
+/* 房间内容给足高度：一屏放不下就滚动，绝不把图表压扁。
+   ★ 关键：各展厅根节点写的是 height:100%，而百分比高度只认父级的
+   height、不认 min-height。若只给 .stage-panel__inner 设 min-height，
+   房间会因为 height 解析成 auto 而塌成内容高度（实测 rank 侧栏只剩 88px）。
+   所以同时给「inner 的直接子元素（房间根节点）」设 min-height，
+   让它有确定高度，内部的 grid / flex 子项才会被撑满。 */
+.dashboard-container.is-scroll .stage-panel__inner {
+  min-height: clamp(860px, 100vh, 1100px);
+}
+.dashboard-container.is-scroll .stage-panel__inner > * {
+  min-height: clamp(860px, 100vh, 1100px);
+}
+.dashboard-container.is-scroll .stage-panel {
+  flex: none;
+}
+
+/* 底栏影评流：从固定覆盖层改为页面末尾的内容块 */
+.dashboard-container.is-scroll .bottom-bar {
+  position: relative;
+  bottom: auto;
+  left: auto;
+  width: 100%;
+  flex: none;
+  margin-top: auto;
+}
+
+/* 回大厅按钮：滚动时钉在视口左上角（否则滚下去就找不到出口了）。
+   top 要落在站点导航（--header-h）+ 本页吸顶状态栏（64px）之下，
+   否则会盖住「影评洞察」品牌字。 */
+.dashboard-container.is-scroll .room-nav__back {
+  position: fixed;
+  top: calc(var(--header-h, 60px) + 72px);
+  left: 24px;
+}
+
+/* 纸卡略微透出背景海报：既保留"电影感"，又不影响深字阅读 */
+.dashboard-container.is-scroll .float-card {
+  background: linear-gradient(178deg, rgba(253, 251, 244, 0.94) 0%, rgba(247, 241, 227, 0.91) 60%, rgba(242, 235, 221, 0.93) 100%);
+  -webkit-backdrop-filter: blur(9px);
+  backdrop-filter: blur(9px);
+}
+
+@media (max-width: 900px) {
+  .dashboard-container.is-scroll .stage-dock { padding: 14px 14px 8px; }
+  .dashboard-container.is-scroll .stage-panel__inner { min-height: 640px; }
+  .dashboard-container.is-scroll .stage-panel__inner > * { min-height: 640px; }
+  .dashboard-container.is-scroll .room-nav__back { top: calc(var(--header-h, 60px) + 68px); left: 12px; }
+}
+
+/* 展厅卡片入场：错峰浮起（每次进房间组件都会重新挂载，动画自然重播）。
+   fill-mode 用 backwards —— 动画结束后立刻交还 transform，
+   否则 fill:both 会一直压着 hover 的抬升效果。 */
+.dashboard-container.is-scroll .stage-panel__inner .float-card {
+  animation: room-card-in .72s cubic-bezier(.16, .84, .44, 1) backwards;
+}
+.dashboard-container.is-scroll .stage-panel__inner .float-card:nth-child(2) { animation-delay: .07s; }
+.dashboard-container.is-scroll .stage-panel__inner .float-card:nth-child(3) { animation-delay: .14s; }
+.dashboard-container.is-scroll .stage-panel__inner .float-card:nth-child(4) { animation-delay: .21s; }
+@keyframes room-card-in {
+  from { opacity: 0; transform: translateY(22px) scale(.992); }
+  to { opacity: 1; transform: none; }
+}
+
+/* 悬停微抬升：纸卡像被指尖掀起一点（A24 / itomdev 的纸质手感） */
+.dashboard-container.is-scroll .float-card {
+  transition: transform .32s ease, box-shadow .32s ease;
+}
+.dashboard-container.is-scroll .float-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 20px 42px rgba(120, 90, 50, .2), inset 0 1px 0 rgba(255, 255, 255, .85);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-container.is-scroll .stage-panel__inner .float-card { animation: none; }
+  .dashboard-container.is-scroll .float-card:hover { transform: none; }
 }

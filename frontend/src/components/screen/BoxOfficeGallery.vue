@@ -196,8 +196,8 @@ function onPosterError(e) { e.target.style.display = 'none' }
   display: flex;
   flex-direction: column;
   height: 100%;
-  min-height: 420px;
-  padding: 10px 14px 14px;
+  min-height: 0;
+  padding: 8px 14px 12px;
   border-radius: 20px;
   background:
     radial-gradient(120% 80% at 50% 0%, rgba(255, 252, 244, 0.92), rgba(250, 245, 235, 0) 60%),
@@ -227,7 +227,10 @@ function onPosterError(e) { e.target.style.display = 'none' }
   flex: 1;
   min-height: 0;
   margin-top: 8px;
-  overflow: hidden;
+  /* 横向滚动交给滚轮漂移（transform），纵向在相框高于视区时允许滚动，
+     保证相框下半截（片名 / 票房）永不被裁切 */
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 .bog__line {
   position: absolute;
@@ -240,9 +243,9 @@ function onPosterError(e) { e.target.style.display = 'none' }
   pointer-events: none;
 }
 .bog__rail {
-  position: absolute;
+  position: relative;
   left: 0;
-  top: 6px;
+  margin-top: 6px;
   display: flex;
   align-items: flex-start;
   gap: 26px;
@@ -254,7 +257,7 @@ function onPosterError(e) { e.target.style.display = 'none' }
 .bog__frame {
   position: relative;
   flex: 0 0 auto;
-  width: 118px;
+  width: 104px;
   padding: 14px 8px 10px;
   display: flex;
   flex-direction: column;
@@ -309,11 +312,12 @@ function onPosterError(e) { e.target.style.display = 'none' }
   background: #5C4326;
 }
 
-/* 相框纸边 + 海报 */
+/* 相框纸边 + 海报：固定高度（不再按 2:3 撑高），整体收一档，
+   画廊压窄后相框仍能完整落进场景，片名/票房不裁切 */
 .bog__mat {
   display: block;
   width: 100%;
-  aspect-ratio: 2 / 3;
+  height: 84px;
   overflow: hidden;
   background: #F1E8D8;
   border: 1.4px solid rgba(107, 78, 46, 0.45);

@@ -71,14 +71,15 @@ const option = computed(() => ({
   },
   series: [{
     type: 'scatter',
-    symbolSize: (v) => 8 + Math.min(22, Math.abs(v[2] ?? 0) * 6),
+    // 173 部同屏：点径收小、透明度降低，密集区不再糊成一团（悬停高亮会放大）
+    symbolSize: (v) => 6.5 + Math.min(15, Math.abs(v[2] ?? 0) * 5),
     data: pts.value.map((p) => ({ ...p, value: [...p.value, p.gap] })),
     itemStyle: {
       color: (p) => {
         const g = p.data.gap
         return g > 0.5 ? U.orange : g < -0.5 ? U.cyan : U.gold
       },
-      opacity: 0.8, borderColor: '#fff', borderWidth: 1,
+      opacity: 0.72, borderColor: '#fff', borderWidth: 0.8,
     },
     emphasis: { itemStyle: { opacity: 1, borderColor: U.text } },
     animationDuration: 900, animationEasing: 'cubicOut',

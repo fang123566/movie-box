@@ -7,6 +7,7 @@
     <div class="dbp__legend">
       <span v-for="s in sentItems" :key="s.key" class="dbp__leg">
         <i :style="{ background: s.color }" />{{ s.label }} <b>{{ s.value }}</b>
+        <em class="dbp__leg-p">{{ s.pct }}%</em>
       </span>
     </div>
 
@@ -60,23 +61,33 @@ const sentOption = computed(() => ({
   }],
 }))
 
-const topRated = computed(() => (props.douban?.top_rated || []).slice(0, 8))
+// 接口共 12 条真实高分片；数据页加长后 8 行会留一大截空白，取满 12 行
+const topRated = computed(() => (props.douban?.top_rated || []).slice(0, 12))
 </script>
 
 <style scoped>
-.dbp { display: flex; flex-direction: column; height: 100%; gap: 8px; }
-.dbp__ring { height: 150px; }
+.dbp { display: flex; flex-direction: column; height: 100%; gap: 3px; }
+/* 数据页加长后高度充裕：情感环放大到可读尺寸（原先压到 38px 是被矮卡片逼的），
+   仍用 clamp 兜底，窄屏下不会把 12 行榜单挤没 */
+.dbp__ring { height: clamp(96px, 13vh, 132px); }
 .dbp__chart { width: 100%; height: 100%; }
-.dbp__legend { display: flex; flex-wrap: wrap; gap: 6px 14px; justify-content: center; margin-top: -4px; }
-.dbp__leg { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--u-text-2); }
-.dbp__leg i { width: 10px; height: 10px; border-radius: 3px; }
+.dbp__legend { display: flex; flex-wrap: wrap; gap: 5px 12px; justify-content: center; margin-top: -3px; }
+.dbp__leg { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--u-text-2); }
+.dbp__leg i { width: 9px; height: 9px; border-radius: 3px; }
 .dbp__leg b { color: var(--u-text); }
+.dbp__leg-p { font-style: normal; font-size: 9.5px; color: rgba(125, 107, 82, .8); }
 .dbp__top-h {
-  margin-top: 4px; font-size: 12.5px; font-weight: 700; color: var(--u-text);
-  border-top: 1px solid var(--u-line); padding-top: 8px;
+  margin-top: 1px; font-size: 12px; font-weight: 700; color: var(--u-text);
+  border-top: 1px solid var(--u-line); padding-top: 4px;
 }
-.dbp__rows { display: flex; flex-direction: column; gap: 4px; overflow-y: auto; flex: 1; min-height: 0; }
-.dbp__row { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; }
+.dbp__rows { display: flex; flex-direction: column; gap: 3px; overflow-y: auto; flex: 1; min-height: 48px; }
+.dbp__row {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  font-size: 11.5px; height: 22px; line-height: 22px;
+  padding: 0 6px; margin: 0 -6px; border-radius: 6px;
+  transition: background .18s ease, transform .18s ease;
+}
+.dbp__row:hover { background: rgba(194, 65, 12, .07); transform: translateX(2px); }
 .dbp__row-t {
   color: var(--u-text); flex: 1; min-width: 0;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
