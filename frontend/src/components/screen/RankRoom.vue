@@ -22,21 +22,35 @@
         <GenreRankCard :by-genre="sentiment?.by_genre || []" />
       </div>
     </aside>
+
+    <!-- 底部：导演口碑榜 + 高分片单（补足"数据要多一点"） -->
+    <div class="rr__bottom">
+      <section class="float-card rr__cell">
+        <DirectorBoard :movies="movies" />
+      </section>
+      <section class="float-card rr__cell">
+        <PosterRail :movies="movies" />
+      </section>
+    </div>
   </div>
 </template>
 
 <script setup>
 // ============================================================
 // 口碑排名：主图（BumpChart） + 侧栏精选（DoubanPanel + 类型口碑榜）
+//            + 底部（导演口碑榜 / 高分片单）
 // ============================================================
 import BumpChart from './BumpChart.vue'
 import DoubanPanel from './DoubanPanel.vue'
 import GenreRankCard from './GenreRankCard.vue'
+import DirectorBoard from './DirectorBoard.vue'
+import PosterRail from './PosterRail.vue'
 
 defineProps({
   matrix: { type: Object, default: null },
   douban: { type: Object, default: null },
   sentiment: { type: Object, default: null },
+  movies: { type: Array, default: () => [] },
 })
 </script>
 
@@ -46,16 +60,30 @@ defineProps({
   min-height: 0;
   display: grid;
   grid-template-columns: 1fr 320px;
+  grid-template-rows: minmax(0, 1fr) clamp(222px, 26vh, 250px);
   gap: 14px;
 }
-.rr__main { min-height: 0; overflow: hidden; }
+.rr__main { grid-column: 1; grid-row: 1; min-height: 0; overflow: hidden; }
 
 .rr__side {
+  grid-column: 2;
+  grid-row: 1 / span 2;
   min-height: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
 }
+
+/* 底部两块：导演榜 + 高分片单 */
+.rr__bottom {
+  grid-column: 1;
+  grid-row: 2;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1.02fr 1fr;
+  gap: 14px;
+}
+.rr__cell { min-height: 0; overflow: hidden; padding: 10px 14px; }
 .rr__side-h {
   flex: none;
   font-size: 12.5px;

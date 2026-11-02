@@ -24,6 +24,9 @@
       <EchoChamber :sentiment="sentiment" :lexicon="lexicon" />
     </div>
 
+    <!-- 左下旋臂图鉴：把星图里每条旋臂翻译成类型名 + 数量 + 均分 -->
+    <ArmLegend v-if="movies.length" :movies="movies" class="galaxy-arms" />
+
     <div class="galaxy-card float-card">
       <div class="galaxy-card__head">
         📖 怎么读这张星图
@@ -47,6 +50,7 @@
 // 星系读图卡（独立组件，便于在大屏 / 深链里复用）
 // ============================================================
 import EchoChamber from './EchoChamber.vue'
+import ArmLegend from './ArmLegend.vue'
 
 const props = defineProps({
   avgRating: { type: Number, default: 0 },
@@ -54,6 +58,7 @@ const props = defineProps({
   sentiment: { type: Object, default: null },
   lexicon: { type: Object, default: null },
   stats: { type: Object, default: null },
+  movies: { type: Array, default: () => [] },
 })
 </script>
 
@@ -63,6 +68,19 @@ const props = defineProps({
   position: relative;
   flex: 1;
   min-height: 0;
+}
+
+/* 左下旋臂图鉴：补掉左下的空白，同时给星图一份"图例说明" */
+.galaxy-arms {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  width: 236px;
+  max-width: 34%;
+  z-index: 2;
+}
+@media (max-width: 1100px) {
+  .galaxy-arms { display: none; }
 }
 
 /* 右上报亭式卡片：情感分布 + 归纳词典（贴右上角，不挡中央星图） */

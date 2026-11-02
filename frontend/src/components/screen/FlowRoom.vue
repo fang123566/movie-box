@@ -23,23 +23,30 @@
         <RegionsPanel :regions="regions" />
       </section>
     </div>
+
+    <!-- 底部：年代胶片（每个年代的代表作，横滑可看） -->
+    <section class="fr__rail float-card">
+      <EraRail :movies="movies" />
+    </section>
   </div>
 </template>
 
 <script setup>
 // ============================================================
-// 年代流向：桑基主图 + 年代故事 / 预告覆盖 / 地区画像 三副卡
+// 年代流向：桑基主图 + 年代故事 / 预告覆盖 / 地区画像 三副卡 + 年代胶片
 // ============================================================
 import SankeyFlow from './SankeyFlow.vue'
 import StoryTimeline from './StoryTimeline.vue'
 import CoveragePanel from './CoveragePanel.vue'
 import RegionsPanel from './RegionsPanel.vue'
+import EraRail from './EraRail.vue'
 
 defineProps({
   matrix: { type: Object, default: null },
   trends: { type: Object, default: null },
   regions: { type: Object, default: null },
   douban: { type: Object, default: null },
+  movies: { type: Array, default: () => [] },
 })
 </script>
 
@@ -57,11 +64,14 @@ defineProps({
   overflow: hidden;
 }
 .fr__bottom {
-  flex: 1.5 1 0;
+  flex: 1.22 1 0;
   min-height: 0;
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
   gap: 14px;
 }
 .fr__cell { min-height: 0; overflow: auto; }
+
+/* 年代胶片：纸面接触印相条，固定高度铺满页面底部 */
+.fr__rail { flex: 0 0 clamp(178px, 21vh, 204px); min-height: 0; overflow: hidden; padding: 9px 14px; }
 </style>

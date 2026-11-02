@@ -1032,6 +1032,21 @@ body.u-body-lock .app-main > * { flex: 1; min-height: 0; }
 .dashboard-container.is-scroll .stage-panel__inner > * {
   min-height: clamp(860px, 100vh, 1100px);
 }
+
+/* 每间展厅按自己的内容量给不同最小高度：页面本来就能滚，
+   给足高度才不会把新加的数据块挤进老面板里（2026-11-02 加数据后调整）。 */
+.dashboard-container.is-scroll .stage-panel__inner > .box-stage {
+  min-height: clamp(980px, 112vh, 1180px);
+}
+.dashboard-container.is-scroll .stage-panel__inner > .rank-room {
+  min-height: clamp(950px, 108vh, 1150px);
+}
+.dashboard-container.is-scroll .stage-panel__inner > .flow-room {
+  min-height: clamp(1010px, 115vh, 1210px);
+}
+.dashboard-container.is-scroll .stage-panel__inner > .diverge-room {
+  min-height: clamp(1110px, 126vh, 1330px);
+}
 .dashboard-container.is-scroll .stage-panel {
   flex: none;
 }
@@ -1046,13 +1061,10 @@ body.u-body-lock .app-main > * { flex: 1; min-height: 0; }
   margin-top: auto;
 }
 
-/* 回大厅按钮：滚动时钉在视口左上角（否则滚下去就找不到出口了）。
-   top 要落在站点导航（--header-h）+ 本页吸顶状态栏（64px）之下，
-   否则会盖住「影评洞察」品牌字。 */
+/* 回大厅按钮：2026-11-02 起搬进吸顶状态栏（.top-bar 内联），
+   不再固定悬浮 —— 否则滚到数据卡上会压住榜单文字。 */
 .dashboard-container.is-scroll .room-nav__back {
-  position: fixed;
-  top: calc(var(--header-h, 60px) + 72px);
-  left: 24px;
+  position: static;
 }
 
 /* 纸卡略微透出背景海报：既保留"电影感"，又不影响深字阅读 */
@@ -1066,7 +1078,6 @@ body.u-body-lock .app-main > * { flex: 1; min-height: 0; }
   .dashboard-container.is-scroll .stage-dock { padding: 14px 14px 8px; }
   .dashboard-container.is-scroll .stage-panel__inner { min-height: 640px; }
   .dashboard-container.is-scroll .stage-panel__inner > * { min-height: 640px; }
-  .dashboard-container.is-scroll .room-nav__back { top: calc(var(--header-h, 60px) + 68px); left: 12px; }
 }
 
 /* 展厅卡片入场：错峰浮起（每次进房间组件都会重新挂载，动画自然重播）。

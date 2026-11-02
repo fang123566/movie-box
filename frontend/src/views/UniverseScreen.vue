@@ -42,6 +42,9 @@
 
       <!-- ---- 01 顶部状态栏 ---- -->
       <header class="top-bar" @pointerenter="hudHover = true" @pointerleave="hudHover = false">
+        <!-- 回大厅：放进吸顶状态栏内（滚动时不会压住下面的数据卡；
+             高对比实底渐变 + 手绘抖边，暖白纸上始终看得见） -->
+        <button v-show="mode === 'room'" class="room-nav__back" type="button" @click="backToHouse">← 回大厅</button>
         <div class="top-bar__brand">
           <span class="top-bar__logo">影评洞察</span>
           <span class="top-bar__sub">实时数据分析大屏</span>
@@ -54,10 +57,6 @@
         </div>
         <button class="top-bar__btn" type="button" @click="toggleFs">⛶ 全屏</button>
       </header>
-
-      <!-- 房间模式：回大厅入口钉在页面左上角（与右上角导览图按钮对称）；
-           高对比实底渐变 + 手绘抖边硬阴影，保证暖白纸上绝不会看不见 -->
-      <button v-show="mode === 'room'" class="room-nav__back" type="button" @click="backToHouse">← 回大厅</button>
 
       <!-- 大厅模式：悬浮导览图按钮（itomdev 汉堡钮位，常驻可见，不会进展厅就找不到北） -->
       <button v-show="mode === 'house'" class="house-map-btn" type="button" @click="mapOpen = true">
@@ -93,6 +92,7 @@
           :sentiment="sentiment"
           :lexicon="lexicon"
           :stats="galaxyStats"
+          :movies="movies"
         />
 
         <!-- 其余展厅：每间各自一套排版（专属舞台组件），玻璃面板仅作承托 -->
@@ -109,8 +109,8 @@
                 :pick="boxPick"
                 @pick="boxPick = $event"
               />
-              <RankRoom v-else-if="view === 'rank'" :matrix="matrix" :douban="douban" :sentiment="sentiment" />
-              <FlowRoom v-else-if="view === 'flow'" :matrix="matrix" :trends="trends" :regions="regions" :douban="douban" />
+              <RankRoom v-else-if="view === 'rank'" :matrix="matrix" :douban="douban" :sentiment="sentiment" :movies="movies" />
+              <FlowRoom v-else-if="view === 'flow'" :matrix="matrix" :trends="trends" :regions="regions" :douban="douban" :movies="movies" />
               <DivergeRoom
                 v-else-if="view === 'diverge'"
                 :divergence="douban?.rating_divergence || []"
@@ -288,6 +288,8 @@ function enterRoom(key) {
   playRoomIntro()
 }
 function backToHouse() {
+  revealIO?.disconnect()
+  revealIO = null
   mode.value = 'house'
   resetScroll()
 }
@@ -308,6 +310,9 @@ function playRoomIntro() {
     gsap.from(['.room-nav'], { y: -18, opacity: 0, duration: 0.55, ease: 'power2.out' })
     gsap.from(['.stage-panel'], { y: 20, opacity: 0, duration: 0.6, delay: 0.08, ease: 'power2.out' })
     gsap.from(['.bottom-bar'], { y: 30, opacity: 0, duration: 0.6, delay: 0.24, ease: 'power2.out' })
+    // Transition(mode=out-in) 有换场时间：错开两次调用，确保新房间的卡片都挂上了
+    setTimeout(setupReveal, 80)
+    setTimeout(setupReveal, 460)
   })
 }
 
@@ -353,8 +358,35 @@ function cjkRatio(text) {
   return n / t.length
 }
 
-/* ---------- 展厅动效：鼠标暖光跟随 + 滚动视差变量 ---------- */
+/* ---------- 展厅动效：鼠标暖光跟随 + 滚动视差变量 + 首屏外卡片渐入 ---------- */
 let spotRaf = 0
+let revealIO = null
+
+/* 首屏之下的卡片先藏起来，滚到跟前再浮上来（A24 的"逐段揭示"节奏）。
+   ★ 只在本容器内观察；JS 失效时卡片默认可见（隐藏类只由 JS 添加）。 */
+function setupReveal() {
+  revealIO?.disconnect()
+  revealIO = null
+  if (!isScroll.value || !root.value) return
+  const cards = root.value.querySelectorAll('.float-card, .box-stage__extras')
+  if (!cards.length) return
+  revealIO = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue
+      e.target.classList.add('is-revealed')
+      revealIO?.unobserve(e.target)
+    }
+  }, { root: root.value, rootMargin: '0px 0px -70px 0px', threshold: 0.01 })
+
+  const fold = window.innerHeight - 40
+  for (const c of cards) {
+    if (c.getBoundingClientRect().top > fold) {
+      c.classList.add('is-below')
+      revealIO.observe(c)
+    }
+  }
+}
+
 function onSpotMove(e) {
   if (spotRaf) return
   spotRaf = requestAnimationFrame(() => {
@@ -444,11 +476,17 @@ onMounted(async () => {
         sentiment: r.sentiment || guessZhTone(r.text),
       }))
   } catch { /* 影评流不可用时静默降级，不影响大屏其余模块 */ }
+
+  // 数据到位后布局会长高：再扫一遍首屏外卡片（否则票房页第三层不会被标记）
+  setTimeout(setupReveal, 500)
+  setTimeout(setupReveal, 1400)
 })
 
 onBeforeUnmount(() => {
   document.body.classList.remove('u-body-lock')
   document.documentElement.classList.remove('u-body-lock')
+  revealIO?.disconnect()
+  revealIO = null
   const el = root.value
   if (el) {
     el.removeEventListener('pointermove', onSpotMove)
@@ -499,21 +537,21 @@ function toggleFs() {
 }
 .room-nav button:hover { background: #8B4513; color: #FFF6E9; transform: translateY(-1px); }
 
-/* ★ 回大厅按钮：钉在页面左上角（与右上角导览图钮对称）。
+/* ★ 回大厅按钮：放在吸顶状态栏里（滚动看数据时也不会压住卡片内容）。
    暖白纸面上必须高对比 / 大号 / 手绘抖边硬阴影，否则用户会"看不见返回按钮"。 */
 .room-nav__back {
-  position: absolute;
-  top: 84px;
-  left: 24px;
-  z-index: 45;
+  flex: none;
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  height: 38px;
+  padding: 0 16px;
   cursor: pointer;
-  padding: 10px 22px;
-  font-size: 15px;
+  font-family: inherit;
+  font-size: 14px;
   font-weight: 800;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
   color: #FFF6E9;
   background: linear-gradient(160deg, #A0522D, #8B4513);
   border: 2.2px solid #5C4326;
@@ -532,7 +570,8 @@ function toggleFs() {
   box-shadow: 0 1px 3px rgba(139, 69, 19, 0.38);
 }
 @media (max-width: 900px) {
-  .room-nav__back { top: 78px; left: 14px; padding: 8px 16px; font-size: 13px; }
+  .room-nav__back { padding: 0 11px; font-size: 13px; height: 34px; }
+  .top-bar__sub { display: none; }
 }
 
 /* 导览图圆钮（手绘纸质小圆牌，itomdev nav-btn 位） */
@@ -673,5 +712,24 @@ function toggleFs() {
 @media (prefers-reduced-motion: reduce) {
   .room-spotlight { display: none; }
   .room-progress i { transition: none; }
+}
+
+/* ---------- 首屏外卡片：滚到跟前再浮起（A24 逐段揭示） ---------- */
+:deep(.float-card.is-below),
+:deep(.box-stage__extras.is-below) { opacity: 0; animation: none; }
+:deep(.float-card.is-below.is-revealed),
+:deep(.box-stage__extras.is-below.is-revealed) {
+  opacity: 1;
+  animation: reveal-in 0.72s cubic-bezier(0.16, 0.84, 0.44, 1) backwards;
+}
+@keyframes reveal-in {
+  from { opacity: 0; transform: translateY(26px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* 减弱动效偏好：不藏、不浮，直接显示（必须放在上面两条之后） */
+@media (prefers-reduced-motion: reduce) {
+  :deep(.float-card.is-below),
+  :deep(.box-stage__extras.is-below) { opacity: 1; animation: none; }
 }
 </style>

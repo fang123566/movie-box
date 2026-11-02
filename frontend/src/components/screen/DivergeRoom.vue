@@ -23,17 +23,21 @@
           <DoubanPanel :douban="douban" />
         </div>
       </section>
+      <section class="dr__cell dr__cell--gap float-card">
+        <GapBoard :divergence="divergence" />
+      </section>
     </div>
   </div>
 </template>
 
 <script setup>
 // ============================================================
-// 口碑分歧：左 = 分化榜（A24 圆盘展）；右 = 分歧散点 + 豆瓣口碑
+// 口碑分歧：左 = 分化榜（A24 圆盘展）；右 = 分歧散点 + 豆瓣口碑 + 平台分歧榜
 // ============================================================
 import PolarizingBoard from './PolarizingBoard.vue'
 import DivergenceChart from './DivergenceChart.vue'
 import DoubanPanel from './DoubanPanel.vue'
+import GapBoard from './GapBoard.vue'
 
 defineProps({
   divergence: { type: Array, default: () => [] },
@@ -65,9 +69,11 @@ defineProps({
   display: flex;
   flex-direction: column;
 }
-/* 豆瓣口碑卡（情感环 + 高分榜）内容比散点图高，给它明显更多竖向空间，
-   确保「豆瓣高分 Top」列表完整露出（overflow:auto 兜底，绝不硬裁） */
-.dr__cell--dbp { flex: 1.55 1 0; }
+/* 豆瓣口碑卡（情感环 + 12 行高分榜）内容最高，给它约两倍竖向空间，
+   散点图与分歧榜各占一份 —— 三块都不需要滚动就能看全 */
+.dr__cell--dbp { flex: 1.95 1 0; }
+/* 平台分歧榜：右栏底部，再补一块真实数据 */
+.dr__cell--gap { flex: 1.02 1 0; }
 .dr__cell-h {
   flex: none;
   font-size: 12.5px;

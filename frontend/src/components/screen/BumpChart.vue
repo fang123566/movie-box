@@ -114,11 +114,16 @@ function buildOption() {
       min: 1,
       max,
       minInterval: 1,
+      // 数值轴默认按 splitNumber=5 取刻度，会跳着显示（第1/第3/第5名）；
+      // 名次是 1..N 的整数，强制步长 1 才能把每一名都标出来
+      interval: 1,
       axisLine: { show: false },
       axisTick: { show: false },
       splitLine: { show: false },
       axisLabel: {
         color: U.text2, fontFamily: U.tech, fontSize: 10,
+        interval: 0,        // 名次只有 6~8 条，全部标出来
+        hideOverlap: false, // 否则 ECharts 仍会静默抽掉「第 3 名」这类中间刻度
         formatter: '第 {value} 名',
       },
     },

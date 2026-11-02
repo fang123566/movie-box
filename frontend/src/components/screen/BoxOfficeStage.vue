@@ -35,6 +35,18 @@
         />
       </div>
     </div>
+
+    <!-- 第三层：票房总账 / 投资回报 / 类型票房（用户要求"数据要多一点"） -->
+    <div class="box-stage__extras">
+      <BoxExtras
+        :gallery="gallery"
+        :total-movies="totalMovies"
+        :total-revenue="totalRevenue"
+        :top-year="topYear"
+        :years="years"
+        @pick="(g) => emit('pick', g)"
+      />
+    </div>
   </div>
 </template>
 
@@ -45,6 +57,7 @@
 import BoxOfficeGallery from './BoxOfficeGallery.vue'
 import BoxOfficeRank from './BoxOfficeRank.vue'
 import BoxOfficeTrend from './BoxOfficeTrend.vue'
+import BoxExtras from './BoxExtras.vue'
 
 const props = defineProps({
   gallery: { type: Array, default: () => [] },
@@ -75,10 +88,10 @@ const emit = defineEmits(['pick'])
   border-radius: 0;
   text-align: left;
 }
-/* 画廊（相框绳）固定占上部：相框约 200px，给到 ~252 让片名/票房完整露出；
-   不再 flex:1 抢满，把剩余空间全留给下方两栏榜单，避免只显示 2/10 行。
-   下方 dock 现在高度更足（舞台整体加高），可放心给画廊多留一点。 */
-.box-stage__gallery { flex: 0 0 clamp(180px, 25vh, 225px); min-height: 0; }
+/* 画廊（相框绳）固定占上部：整张相框约 181px + 场景内边距，
+   给到 262 才不会把片名/票房的最后一行裁掉（2026-11-02 实测 156px 场景裁掉 31px）。
+   下方 dock 仍有余量（10 行榜单只需约 270px），所以让画廊多拿一点。 */
+.box-stage__gallery { flex: 0 0 clamp(212px, 29vh, 262px); min-height: 0; }
 /* 让画廊随舞台收缩（默认 min-height:420 会在窄舞台顶破容器） */
 .box-stage__gallery :deep(.bog) { min-height: 0; }
 
@@ -103,4 +116,8 @@ const emit = defineEmits(['pick'])
   overflow: hidden;
 }
 .box-stage__cell--trend { padding-bottom: 10px; }
+
+/* 第三层数据背板：固定高度，占页面下半屏（不再抢榜单的空间）。
+   243px 才够 8 行 ROI + 抬头 + 脚注全部露出（实测 225 会裁掉最后一行）。 */
+.box-stage__extras { flex: 0 0 clamp(226px, 27vh, 250px); min-height: 0; }
 </style>
