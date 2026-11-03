@@ -42,32 +42,34 @@ async def similar(
     movie_id: str,
     size: int = Query(default=10, ge=1, le=50, description="返回多少部相似影片"),
 ) -> SimilarResponse:
-    """与指定影片"气质相近"的其它影片（more_like_this 内容相似）。
+    """与指定影片"气质相近"的其它影片。
 
-    MLT 拿该片自己的简介/片名/类型按分析器切词，再去全库找文本重合度高的片，
-    不需要任何人工标注的"相似片"表。参考片不存在 → 404；
-    库里有该片但找不到相近的 → 200 + 空列表 + note（不是错误）。
+    两段召回，理由分开写：
+        1. more_like_this —— 拿该片自己的简介/片名/类型找文本重合度高的片，
+           不需要任何人工标注的"相似片"表；
+        2. 同类型补齐 —— MLT 召回不足 size 张时，用同类型 + 评分/年代接近的片补上，
+           不让详情页只剩一两个卡片。
+    参考片不存在 → 404；库里实在没有相近的 → 200 + 空列表 + note（不是错误）。
     """
     try:
-        base, hits = await similar_movies(movie_id, size)
+        base, contents, extras = await similar_movies(movie_id, size)
     except SearchUnavailable as exc:
         raise es_unavailable(exc) from exc
     if base is None:
         raise HTTPException(status_code=404, detail=f"找不到 movie_id={movie_id} 的电影")
 
     base_name = base.title_zh or base.title or movie_id
-    items = [
-        RecommendItem(
-            movie=m,
-            reason=f"与《{base_name}》在剧情与类型上气质相近",
-            score=m.score,
-        )
-        for m in hits
-    ]
-    note = None
-    if not items:
-        note = "片库里暂未找到与它气质相近的其它影片（可能文本字段太稀疏）"
-    return SimilarResponse(base=base, items=items, note=note)
+    genres = "、".join((base.genres_zh or [])[:2])
+    content_reason = f"与《{base_name}》在剧情与类型上气质相近"
+    genre_reason = (f"同属「{genres}」，评分与年代也接近" if genres
+                    else "评分与年代跟它接近")
+    items = (
+        [RecommendItem(movie=m, reason=content_reason, score=m.score) for m in contents]
+        + [RecommendItem(movie=m, reason=genre_reason, score=m.score) for m in extras]
+    )
+    mode = "content" if contents else ("genre" if extras else "none")
+    note = None if items else "片库里暂时没有与它相近的其它影片"
+    return SimilarResponse(base=base, items=items, mode=mode, note=note)
 
 
 @router.get("/popular", response_model=PopularResponse, summary="热门榜单（贝叶斯加权）")

@@ -26,6 +26,9 @@ class SimilarResponse(BaseModel):
 
     base: MovieHit
     items: list[RecommendItem] = Field(default_factory=list)
+    mode: str = Field(
+        default="content",
+        description="召回方式：content=文本相似，genre=同类型兜底，none=参考片不存在")
     note: str | None = None
 
 

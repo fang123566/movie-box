@@ -158,6 +158,7 @@ def _to_movie_hit(hit: dict) -> MovieHit:
         title_en=src.get("title_en"),
         year=src.get("release_year"),
         release_date=src.get("release_date"),
+        release_year=src.get("release_year"),
         runtime=src.get("runtime"),
         rating=src.get("vote_average"),
         votes=src.get("vote_count"),
@@ -194,6 +195,7 @@ def _to_review_hit(hit: dict) -> ReviewHit:
         word_count=src.get("word_count"),
         text=src.get("text"),
         dataset=src.get("dataset"),
+        source=src.get("source"),
         score=hit.get("_score"),
         highlight=hit.get("highlight") or {},
     )

@@ -74,6 +74,14 @@ class TopicsResponse(BaseModel):
     negative_vocabulary: list[str] = Field(default_factory=list)
 
 
+class GenreRef(BaseModel):
+    """同类型口碑参照：把这部片放回它自己的类型里看。"""
+
+    genre: str
+    avg_rating: float | None = None
+    movies: int = 0
+
+
 class MovieInsight(BaseModel):
     """单片画像：电影自身字段 + 关键词 + 与全局情感的对照。"""
 
@@ -89,6 +97,42 @@ class MovieInsight(BaseModel):
     keywords: list[KeywordItem] = Field(default_factory=list)
     sentiment_hint: str | None = Field(
         default=None, description="基于该片类型的全局好评率给出的口碑参考")
+    genre_ref: GenreRef | None = Field(
+        default=None, description="同类型均分参照（前端画「本片 vs 类型均分」对比条）")
+
+
+class VoiceItem(BaseModel):
+    """一条观众短评（真实原文，非模板生成）。"""
+
+    review_id: str
+    text: str
+    sentiment: str | None = None
+    sentiment_score: float | None = None
+    source: str | None = Field(default=None, description="douban / tmdb / kaggle")
+    movie_id: str | None = None
+    movie_title: str | None = Field(default=None, description="同类型短评时用来标出处影片")
+    rating: float | None = None
+    word_count: int | None = None
+
+
+class VoiceStats(BaseModel):
+    """短评的情感构成：正面 / 中性 / 负面各多少条。"""
+
+    total: int = 0
+    positive: int = 0
+    neutral: int = 0
+    negative: int = 0
+    avg_rating: float | None = None
+
+
+class MovieVoices(BaseModel):
+    """单片口碑：本片短评；本片没有时退回同类型影片的真实短评。"""
+
+    movie_id: str
+    scope: str = Field(description="own=本片短评，peers=同类型影片短评，none=都没有")
+    genres_zh: list[str] = Field(default_factory=list)
+    stats: VoiceStats = Field(default_factory=VoiceStats)
+    items: list[VoiceItem] = Field(default_factory=list)
 
 
 class SentimentBucket(BaseModel):

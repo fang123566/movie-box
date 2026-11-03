@@ -127,6 +127,8 @@ class MovieHit(BaseModel):
     title_en: str | None = None
     year: int | None = None
     release_date: str | None = None
+    release_year: int | None = Field(
+        default=None, description="与 year 同值的兼容别名（老前端按 release_year 取年份）")
     runtime: int | None = None
     rating: float | None = None
     votes: int | None = None
@@ -184,6 +186,8 @@ class ReviewHit(BaseModel):
     word_count: int | None = None
     text: str | None = None
     dataset: str | None = None
+    source: str | None = Field(
+        default=None, description="语料来源（douban / tmdb / kaggle），前端用来标出处")
     score: float | None = None
     highlight: dict[str, list[str]] = Field(default_factory=dict)
 

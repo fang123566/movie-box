@@ -31,6 +31,7 @@ from backend.api.v1.errors import es_unavailable as _guard
 from backend.api.v1.img import rewrite_poster_url
 from backend.schemas.insights import (
     GenreRating,
+    GenreRef,
     BoxOfficeItem,
     BoxOfficeResponse,
     BoxOfficeYearBucket,
@@ -39,6 +40,7 @@ from backend.schemas.insights import (
     MatrixResponse,
     MatrixRow,
     MovieInsight,
+    MovieVoices,
     PolarizingItem,
     PolarizingResponse,
     Quote,
@@ -55,6 +57,8 @@ from backend.schemas.insights import (
     TopicsResponse,
     TrendBucket,
     TrendsResponse,
+    VoiceItem,
+    VoiceStats,
     WordHit,
 )
 from backend.services.query_builder import (
@@ -501,6 +505,7 @@ async def movie_insight(movie_id: str) -> MovieInsight:
     # 口碑参考：该片所属类型的全局均分。一部片常有多个类型，
     # 只取匹配到的第一个做参考，字段名也写明是"参考"而不是该片的口碑。
     hint = None
+    genre_ref = None
     if movie.genres_zh:
         try:
             stats = await sentiment_stats()
@@ -509,6 +514,8 @@ async def movie_insight(movie_id: str) -> MovieInsight:
         for g in (stats.by_genre if stats else []):
             if g.genre in movie.genres_zh and g.avg_rating is not None:
                 hint = f"「{g.genre}」类影片全局均分 {g.avg_rating}（{g.movies} 部）"
+                genre_ref = GenreRef(
+                    genre=g.genre, avg_rating=g.avg_rating, movies=g.movies)
                 break
 
     return MovieInsight(
@@ -523,6 +530,249 @@ async def movie_insight(movie_id: str) -> MovieInsight:
         sources=movie.sources,
         keywords=keywords,
         sentiment_hint=hint,
+        genre_ref=genre_ref,
+    )
+
+
+# ============================================================
+# 单片口碑短评（详情页「观众怎么说」）
+# ============================================================
+
+VOICE_LIMIT = 240          # 单条短评上屏字数上限
+VOICE_MIN_CHARS = 12       # 洗完后短于这个长度不构成一条观点
+PEER_POOL = 60             # 同类型兜底时最多看多少部片的短评
+
+_CJK_RE = re.compile(r"[\u4e00-\u9fff]")
+
+
+def _cjk_ratio(text: str) -> float:
+    """中文占比。中文站优先上中文短评，英文长评排后面（不是删掉）。"""
+    if not text:
+        return 0.0
+    return len(_CJK_RE.findall(text)) / len(text)
+
+
+def _clean_voice(text: str | None) -> str | None:
+    """短评上屏前的清洗：去 markdown 标记、链接、推广尾巴，压掉多余空白。"""
+    if not text:
+        return None
+    t = _URL.sub(" ", text)
+    t = _MD.sub("", t)
+    t = _SPAM.sub("", t)
+    t = _WS.sub(" ", t).strip(" .,;:!—-·\t")
+    if len(t) < VOICE_MIN_CHARS:
+        return None
+    return t[:VOICE_LIMIT]
+
+
+def _voice_stats(resp: dict) -> VoiceStats:
+    """从 ES 响应里取情感构成与均分。"""
+    aggs = resp.get("aggregations") or {}
+    buckets = {
+        str(b.get("key")): int(b.get("doc_count") or 0)
+        for b in ((aggs.get("sentiment") or {}).get("buckets") or [])
+    }
+    avg = (aggs.get("rating") or {}).get("value")
+    return VoiceStats(
+        total=int((resp.get("hits") or {}).get("total", {}).get("value") or 0),
+        positive=buckets.get("positive", 0),
+        neutral=buckets.get("neutral", 0),
+        negative=buckets.get("negative", 0),
+        avg_rating=round(float(avg), 2) if avg is not None else None,
+    )
+
+
+async def _fetch_voices(
+    es, movie_ids: list[str], size: int, diversify: bool = False
+) -> tuple[VoiceStats, list[VoiceItem]]:
+    """按影片 id 取真实短评。
+
+    sort=word_count desc：先拿写得长的（信息量大、不像"好看""难看"），
+    diversify=True 时按影片去重 —— 同类型兜底不能让一部片的短评占满整屏。
+    """
+    if not movie_ids:
+        return VoiceStats(), []
+    query = ({"terms": {"movie_id": movie_ids}} if len(movie_ids) > 1
+             else {"term": {"movie_id": movie_ids[0]}})
+    resp = await es.search(
+        index=settings.es_index_reviews,
+        size=max(size * 6, 36),
+        query=query,
+        sort=[{"word_count": {"order": "desc"}}],
+        aggs={
+            "sentiment": {"terms": {"field": "sentiment", "size": 3}},
+            "rating": {"avg": {"field": "rating"}},
+        },
+        track_total_hits=True,
+        _source=["review_id", "movie_id", "movie_title", "sentiment",
+                 "sentiment_score", "source", "rating", "word_count", "text"],
+    )
+    stats = _voice_stats(resp)
+
+    # 候选池：先清洗，再按「中文语料优先 → 写得长优先」定序。
+    # 为什么不按 ES 的顺序直接截前 N 条：按 word_count 排出来的头部
+    # 常常是清一色长篇差评（或清一色好评），放到详情页像被带了节奏。
+    pool: list[VoiceItem] = []
+    per_movie: dict[str, int] = {}
+    for h in (resp.get("hits") or {}).get("hits") or []:
+        s = h.get("_source") or {}
+        mid = s.get("movie_id")
+        if diversify and per_movie.get(mid, 0) >= 2:
+            continue
+        text = _clean_voice(s.get("text"))
+        if not text:
+            continue
+        if diversify:
+            per_movie[mid] = per_movie.get(mid, 0) + 1
+        pool.append(VoiceItem(
+            review_id=str(s.get("review_id") or h.get("_id") or ""),
+            text=text,
+            sentiment=s.get("sentiment"),
+            sentiment_score=s.get("sentiment_score"),
+            source=s.get("source"),
+            movie_id=mid,
+            movie_title=s.get("movie_title"),
+            rating=s.get("rating"),
+            word_count=s.get("word_count"),
+        ))
+
+    pool.sort(key=lambda v: (v.source != "douban",
+                             -round(_cjk_ratio(v.text or ""), 2),
+                             -(v.word_count or 0)))
+
+    # 正 / 负 / 中性轮转取，保证一屏里既有夸的也有骂的 ——
+    # 观众的真实分歧比"全是好评"更有信息量。
+    buckets: dict[str, list[VoiceItem]] = {"positive": [], "negative": [], "neutral": []}
+    leftovers: list[VoiceItem] = []
+    for v in pool:
+        (buckets[v.sentiment] if v.sentiment in buckets else leftovers).append(v)
+
+    items: list[VoiceItem] = []
+    while len(items) < size:
+        picked = False
+        for key in ("positive", "negative", "neutral"):
+            if buckets[key] and len(items) < size:
+                items.append(buckets[key].pop(0))
+                picked = True
+        if not picked:
+            break
+    if len(items) < size:
+        items.extend(leftovers[: size - len(items)])
+    return stats, items
+
+
+async def _genre_weights() -> dict[str, float]:
+    """类型的"稀有度"权重：越少见的类型权重越高（IDF 思路）。
+
+    「剧情」这种大标签占了全库近一半，共享它说明不了任何相似性；
+    「武侠」「历史」只有十来部，共享一个就非常说明问题。
+    每次请求实时算一次 terms 聚合太浪费，结果进 TTL 缓存（类型分布几乎不变）。
+    """
+    async def _produce() -> dict[str, float]:
+        resp = await get_es().options(request_timeout=10).search(
+            index=settings.es_index_movies, size=0,
+            aggs={"g": {"terms": {"field": "genres_zh", "size": 100}}},
+        )
+        buckets = {
+            str(b["key"]): int(b["doc_count"])
+            for b in (resp.get("aggregations", {}).get("g", {}) or {}).get("buckets", [])
+        }
+        if not buckets:
+            return {}
+        total = sum(buckets.values())
+        return {k: total / max(v, 1) for k, v in buckets.items()}
+
+    try:
+        return await cache.get_or_set("insights:genre_weight", _produce, ttl=600)
+    except Exception:  # noqa: BLE001 —— 权重算不出来就退回"共享即 1 分"
+        return {}
+
+
+async def _peer_movie_ids(es, movie) -> list[str]:
+    """同类型的其它影片，按"共享类型的稀有度之和 + 热度"排序。
+
+    为什么不能只按票数或只数共享类型个数：一部片的类型常是
+    「剧情/动作/历史/武侠」，只按票数排会捞进《盗梦空间》《复仇者联盟》——
+    它们也挂「剧情/动作」，但跟武侠片毫无关系。按稀有度加权后，
+    共享「武侠」「历史」的《一代宗师》《卧虎藏龙》才会浮上来。
+    """
+    bool_query: dict = {"must_not": [{"term": {"movie_id": movie.movie_id}}]}
+    if movie.genres_zh:
+        bool_query["filter"] = [{"terms": {"genres_zh": list(movie.genres_zh)}}]
+    resp = await es.search(
+        index=settings.es_index_movies,
+        size=200,
+        query={"bool": bool_query},
+        sort=[{"vote_count": {"order": "desc"}}],
+        _source=["movie_id", "genres_zh", "vote_count"],
+    )
+    own = set(movie.genres_zh or [])
+    weights = await _genre_weights()
+    rare = max(weights.values()) if weights else 1.0
+    cands: list[tuple[float, int, str]] = []
+    for h in resp["hits"]["hits"]:
+        s = h.get("_source") or {}
+        mid = s.get("movie_id")
+        if not mid:
+            continue
+        # 没进权重表说明全库都少见，按最稀有处理
+        score = sum(weights.get(g, rare) for g in own & set(s.get("genres_zh") or []))
+        cands.append((score, int(s.get("vote_count") or 0), mid))
+    cands.sort(key=lambda c: (-c[0], -c[1]))
+    return [c[2] for c in cands[:PEER_POOL]]
+
+
+@router.get("/movies/{movie_id}/voices", response_model=MovieVoices,
+            summary="单片观众短评（本片没有时退回同类型）")
+async def movie_voices(
+    movie_id: str,
+    size: int = Query(default=8, ge=3, le=16, description="展示多少条短评"),
+) -> MovieVoices:
+    """这部片观众到底怎么说的。
+
+    先找本片的真实短评（豆瓣 / TMDB / Kaggle 三个语料库都算）；
+    本片确实一条都没有，就退回**同类型影片的真实短评**，
+    并在 scope 里如实标成 peers —— 页面文案随之改成"同类型观众在聊什么"，
+    不会把别的片的评价冒充成本片口碑。
+    """
+    try:
+        movie = await get_movie(movie_id)
+    except SearchUnavailable as exc:
+        raise _guard(exc) from exc
+    if movie is None:
+        raise HTTPException(status_code=404, detail=f"找不到 movie_id={movie_id} 的电影")
+
+    es = get_es().options(request_timeout=20)
+    try:
+        stats, items = await _fetch_voices(es, [movie_id], size)
+        scope = "own"
+        if not items:
+            # 同类型兜底分两档：先试「类型高度重合」的少数几部（邻居更像），
+            # 它们没人写短评再放开到更大的同类型池子。
+            peer_ids = await _peer_movie_ids(es, movie)
+            batches = [peer_ids[:12], peer_ids]
+            if len(batches[0]) == len(batches[1]):
+                batches = batches[:1]
+            for batch in batches:
+                if not batch:
+                    continue
+                stats, items = await _fetch_voices(es, batch, size, diversify=True)
+                if items:
+                    break
+            scope = "peers" if items else "none"
+    except SearchUnavailable as exc:
+        raise _guard(exc) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise _guard(SearchUnavailable(f"{type(exc).__name__}: {exc}")) from exc
+
+    # 不进程级缓存：单条 term 查询本身只要几毫秒，
+    # 而按 movie_id 建 key 会迅速挤掉首页大屏那几个昂贵的聚合缓存。
+    return MovieVoices(
+        movie_id=movie_id,
+        scope=scope,
+        genres_zh=list(movie.genres_zh or []),
+        stats=stats,
+        items=items,
     )
 
 

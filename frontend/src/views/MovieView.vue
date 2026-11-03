@@ -22,6 +22,7 @@ const router = useRouter()
 const movie = ref(null)
 const insight = ref(null)
 const similar = ref([])
+const similarMode = ref('content')
 const loading = ref(true)
 const error = ref('')
 const overviewOpen = ref(false)
@@ -29,22 +30,49 @@ const watched = ref(false)
 
 const cast = computed(() => (movie.value?.cast || []).slice(0, 3))
 
-// 豆瓣短评（本片）：单独拉取 source=douban 的影评，凑成「国内口碑」一角。
-// 失败不影响主信息（豆瓣数据只是锦上添花）。
-const doubanReviews = ref([])
-async function loadDoubanReviews(id) {
-  doubanReviews.value = []
+// 观众短评（本片）：豆瓣 / TMDB / Kaggle 三个语料库一起找。
+// 本片确实没有短评时，后端会退回同类型影片的真实短评，scope='peers' ——
+// 页面文案随之改成"同类型观众在聊什么"，不拿别的片的评价冒充本片。
+const voices = ref({ scope: 'none', items: [], stats: {}, genres_zh: [] })
+const keywordTags = computed(() => (insight.value?.keywords || []).slice(0, 14))
+
+// 本片评分 vs 同类型均分：把评分放回类型里看，比孤立一个数字有信息量。
+const genreRef = computed(() => {
+  const g = insight.value?.genre_ref
+  if (!g || g.avg_rating == null || movie.value?.rating == null) return null
+  const gap = movie.value.rating - g.avg_rating
+  return {
+    ...g,
+    gap,
+    text: Math.abs(gap) < 0.3
+      ? `与「${g.genre}」类平均分基本持平`
+      : `比「${g.genre}」类平均分${gap > 0 ? '高' : '低'} ${Math.abs(gap).toFixed(2)} 分`,
+  }
+})
+// 评分条宽度：10 分制直接映射成百分比，底衬统一，长短一眼可比
+const ratingWidth = (v) => `${Math.max(4, Math.min(100, (Number(v) || 0) * 10))}%`
+
+const sentimentTotal = computed(() => {
+  const s = voices.value?.stats || {}
+  return (s.positive || 0) + (s.neutral || 0) + (s.negative || 0)
+})
+const sentimentPct = computed(() => {
+  const t = sentimentTotal.value || 1
+  const s = voices.value?.stats || {}
+  const p = Math.round(((s.positive || 0) / t) * 100)
+  const n = Math.round(((s.negative || 0) / t) * 100)
+  return { pos: p, neg: n, neu: Math.max(0, 100 - p - n) }
+})
+const SOURCE_LABEL = { douban: '豆瓣', tmdb: 'TMDB', kaggle: 'Kaggle' }
+const sourceLabel = (s) => SOURCE_LABEL[s] || '影评'
+
+async function loadVoices(id) {
+  voices.value = { scope: 'none', items: [], stats: {}, genres_zh: [] }
   try {
-    const resp = await api.searchReviews({
-      movie_id: id,
-      source: ['douban'],
-      size: 6,
-      sort: 'relevance',
-      with_facets: false,
-    })
-    doubanReviews.value = resp?.hits || []
+    const resp = await api.movieVoices(id, 8)
+    if (resp) voices.value = resp
   } catch {
-    doubanReviews.value = []
+    voices.value = { scope: 'none', items: [], stats: {}, genres_zh: [] }
   }
 }
 
@@ -104,8 +132,16 @@ async function load() {
   }
   // 次要数据失败不影响主信息
   api.movieInsight(id).then((d) => { insight.value = d }).catch(() => {})
-  api.similar(id, 8).then((d) => { similar.value = d?.hits || [] }).catch(() => {})
-  loadDoubanReviews(id).catch(() => {})
+  // 相似推荐：接口返回 {base, items:[{movie, reason}], mode}，
+  // 之前误取 hits 导致永远空列表 —— 统一在这里拍平成影片数组。
+  api.similar(id, 8)
+    .then((d) => {
+      const list = (d?.items || []).map((x) => x.movie).filter(Boolean)
+      similar.value = list.length ? list : (d?.hits || [])
+      similarMode.value = d?.mode || 'content'
+    })
+    .catch(() => { similar.value = [] })
+  loadVoices(id).catch(() => {})
   loadTrailers(id).catch(() => {})
   if (auth.isLoggedIn.value) {
     api.watchlist().then((list) => {
@@ -257,53 +293,106 @@ function share() {
         </div>
       </div>
 
-      <!-- 情感 / 关键词 -->
+      <!-- 口碑与关键词：把评分放回它的类型里看 -->
       <section class="panel mt-24">
         <h2 class="block__title">💬 口碑与关键词</h2>
-        <p v-if="insight?.sentiment_hint" class="mv__hint">{{ insight.sentiment_hint }}</p>
-        <div v-if="(insight?.keywords || []).length" class="mv__kw">
-          <span v-for="k in insight.keywords.slice(0, 14)" :key="k.term || k.keyword" class="tag tag--genre">
+
+        <div v-if="genreRef" class="mv-cmp">
+          <div class="mv-cmp__row">
+            <span class="mv-cmp__label">本片</span>
+            <div class="mv-cmp__track">
+              <i class="mv-cmp__fill is-self" :style="{ width: ratingWidth(movie.rating) }" />
+            </div>
+            <b class="mv-cmp__val">{{ movie.rating.toFixed(1) }}</b>
+          </div>
+          <div class="mv-cmp__row">
+            <span class="mv-cmp__label">{{ genreRef.genre }}类均分</span>
+            <div class="mv-cmp__track">
+              <i class="mv-cmp__fill" :style="{ width: ratingWidth(genreRef.avg_rating) }" />
+            </div>
+            <b class="mv-cmp__val">{{ genreRef.avg_rating.toFixed(2) }}</b>
+          </div>
+          <p class="mv-cmp__note">
+            {{ genreRef.text }}
+            <span class="mv-cmp__scope">（{{ genreRef.movies }} 部{{ genreRef.genre }}类影片参照）</span>
+          </p>
+        </div>
+
+        <div v-if="keywordTags.length" class="mv__kw">
+          <span v-for="k in keywordTags" :key="k.term || k.keyword" class="tag tag--genre">
             {{ k.term || k.keyword }}
           </span>
         </div>
-        <p v-else class="text-3 text-sm">该片暂无关键词</p>
-        <p class="mv__gap">
-          注：清单中的「方面情感雷达（剧情/演技/特效/节奏/结局/音乐）」需要方面级标注语料，
-          当前影评只有整篇情感，故未实现。
-        </p>
+        <p v-else class="text-3 text-sm">本片暂无关键词标签</p>
       </section>
 
-      <!-- 豆瓣短评（本片）：母语中文短评，作为「国内口碑」一角 -->
+      <!-- 观众短评：本片没有时退回同类型影片的真实短评 -->
       <section class="panel mt-24">
-        <h2 class="block__title">🟢 豆瓣短评（本片）</h2>
-        <div v-if="doubanReviews.length" class="mv__douban-reviews">
-          <article v-for="r in doubanReviews" :key="r.review_id" class="mv__douban-review">
-            <div class="mv__douban-review__head">
-              <span v-if="r.sentiment" class="sent" :class="`sent--${r.sentiment}`">
-                {{ { positive: '正面', negative: '负面', neutral: '中性' }[r.sentiment] || r.sentiment }}
+        <div class="mv-voices__head">
+          <h2 class="block__title">🗣 观众怎么说</h2>
+          <span v-if="voices.scope === 'own'" class="mv-voices__count">
+            共 {{ voices.stats.total }} 条短评
+          </span>
+        </div>
+
+        <!-- 情感构成：一屏看懂这片子是夸是骂 -->
+        <div v-if="voices.scope === 'own' && sentimentTotal" class="mv-voices__mood">
+          <div class="mv-voices__bar">
+            <span class="mv-voices__seg is-pos" :style="{ flex: voices.stats.positive || 0 }" />
+            <span class="mv-voices__seg is-neu" :style="{ flex: voices.stats.neutral || 0 }" />
+            <span class="mv-voices__seg is-neg" :style="{ flex: voices.stats.negative || 0 }" />
+          </div>
+          <div class="mv-voices__legend">
+            <span><i class="dot dot--pos" />正面 {{ sentimentPct.pos }}%</span>
+            <span><i class="dot dot--neu" />中性 {{ sentimentPct.neu }}%</span>
+            <span><i class="dot dot--neg" />负面 {{ sentimentPct.neg }}%</span>
+            <span v-if="voices.stats.avg_rating != null" class="mv-voices__avg">
+              短评均分 {{ voices.stats.avg_rating.toFixed(1) }}
+            </span>
+          </div>
+        </div>
+
+        <p v-if="voices.scope === 'peers'" class="mv-voices__lead">
+          本片还没有观众短评，先看看同类型（{{ (voices.genres_zh || []).slice(0, 2).join(' · ') || '相近题材' }}）影片的观众在聊什么。
+        </p>
+
+        <div v-if="voices.items.length" class="mv-voices__grid">
+          <article v-for="v in voices.items" :key="v.review_id" class="mv-voice">
+            <div class="mv-voice__head">
+              <span class="mv-voice__src" :class="`is-${v.source || 'other'}`">{{ sourceLabel(v.source) }}</span>
+              <span v-if="v.sentiment" class="sent" :class="`sent--${v.sentiment}`">
+                {{ { positive: '好评', negative: '差评', neutral: '中立' }[v.sentiment] || v.sentiment }}
               </span>
-              <span v-if="r.word_count" class="mv__douban-review__words">{{ r.word_count }} 词</span>
+              <span v-if="v.rating != null" class="mv-voice__rating">★ {{ v.rating.toFixed(1) }}</span>
             </div>
-            <p class="mv__douban-review__text">{{ (r.highlight?.text && r.highlight.text.length) ? r.highlight.text.join(' … ') : (r.text || '').slice(0, 200) }}</p>
+            <p class="mv-voice__text">{{ v.text }}</p>
+            <p v-if="voices.scope === 'peers' && v.movie_title" class="mv-voice__from">— 《{{ v.movie_title }}》的一条短评</p>
           </article>
         </div>
         <p v-else class="text-3 text-sm">
-          本片暂无豆瓣短评（豆瓣数据仅覆盖库内部分影片，且按公开页慢速采集）。
+          本片和同类型影片都还没有收录短评。
           <a :href="doubanSearchUrl" target="_blank" rel="noopener noreferrer" class="mv__link">去豆瓣看看 ›</a>
         </p>
       </section>
 
       <!-- 相似推荐 -->
       <section class="mt-24">
-        <h2 class="block__title">🎯 相似推荐</h2>
+        <div class="mv-voices__head">
+          <h2 class="block__title">🎯 相似推荐</h2>
+          <span v-if="similar.length" class="mv-voices__count">
+            {{ similarMode === 'genre' ? '同类型 · 评分与年代接近' : '简介与类型气质相近' }}
+          </span>
+        </div>
         <div v-if="similar.length" class="mix-grid">
           <div v-for="m in similar" :key="m.movie_id" class="mixcard" @click="router.push(`/movie/${encodeURIComponent(m.movie_id)}`)">
             <div class="mixcard__poster">
-              <img v-if="m.poster_url" :src="m.poster_url" :alt="m.title" loading="lazy" />
+              <img v-if="m.poster_url" :src="m.poster_url" :alt="m.title" loading="eager" />
               <div v-else class="mixcard__ph">🎬</div>
             </div>
             <div class="mixcard__title">{{ m.title }}</div>
-            <div class="mixcard__meta">{{ m.release_year || '—' }}</div>
+            <div class="mixcard__meta">
+              {{ m.year || m.release_year || '—' }} · {{ (m.genres_zh || []).slice(0, 2).join('/') || '—' }}
+            </div>
             <div class="mixcard__score">⭐ {{ (m.rating ?? 0).toFixed(1) }}</div>
           </div>
         </div>

@@ -20,6 +20,7 @@ from backend.schemas.search import MovieHit
 from backend.services.query_builder import (
     build_for_you_query,
     build_popular_query,
+    build_similar_fallback_query,
     build_similar_query,
 )
 from backend.services.search_service import SearchUnavailable, _to_movie_hit, get_movie
@@ -92,18 +93,56 @@ async def _global_avg_rating(es: AsyncElasticsearch) -> float:
     return float(value) if value is not None else 6.0
 
 
-async def similar_movies(movie_id: str, size: int = 10) -> tuple[MovieHit | None, list[MovieHit]]:
-    """相似影片。返回 (参考片, 相似片列表)。参考片不存在 → (None, [])。"""
+async def similar_movies(
+    movie_id: str, size: int = 10
+) -> tuple[MovieHit | None, list[MovieHit], list[MovieHit]]:
+    """相似影片。返回 (参考片, 文本相似, 同类型补充)。
+
+    两段召回：
+        more_like_this  —— 文本层面的"气质相近"（首选，理由最硬）
+        同类型兜底      —— MLT 召回不足时补齐 + 文本太稀疏时保底
+
+    ★ 为什么要补齐而不是只做兜底：MLT 常常只召回 1-2 条（片库只有几百部，
+      简介短、类型单一），详情页就只剩两张卡，看起来像坏了。
+      先给 MLT 的强相关结果，再用同类型补齐到 size 张 ——
+      两段在原因为不同的 reason 里分别说明，前端不会混为一谈。
+    """
     base = await get_movie(movie_id)
     if base is None:
-        return None, []
+        return None, [], []
     es = get_es()
     try:
         resp = await es.search(index=settings.es_index_movies,
                                **build_similar_query(movie_id, settings.es_index_movies, size))
+        contents = [_to_movie_hit(h) for h in resp["hits"]["hits"]]
+        if len(contents) >= size:
+            return base, contents, []
+
+        seen = {m.movie_id for m in contents} | {base.movie_id}
+        extra_size = size - len(contents) + len(seen)
+        resp = await es.search(
+            index=settings.es_index_movies,
+            **build_similar_fallback_query(
+                movie_id,
+                genres=list(base.genres_zh or []),
+                rating=base.rating,
+                year=base.year,
+                size=extra_size,
+            ),
+        )
     except Exception as exc:  # noqa: BLE001
         raise SearchUnavailable(f"{type(exc).__name__}: {exc}") from exc
-    return base, [_to_movie_hit(h) for h in resp["hits"]["hits"]]
+
+    extras: list[MovieHit] = []
+    for h in resp["hits"]["hits"]:
+        m = _to_movie_hit(h)
+        if m.movie_id in seen:
+            continue
+        seen.add(m.movie_id)
+        extras.append(m)
+        if len(contents) + len(extras) >= size:
+            break
+    return base, contents, extras
 
 
 async def popular_movies(size: int = 20) -> tuple[list[MovieHit], dict]:

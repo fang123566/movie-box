@@ -1211,13 +1211,78 @@
 .mv__trailer-fallback a { color: #ffd479; text-decoration: none; font-size: 13px; }
 .mv__trailer-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 
-/* 豆瓣短评（本片） */
-.mv__douban-reviews { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
-.mv__douban-review { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; background: var(--surface); }
-.mv__douban-review__head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-.mv__douban-review__words { font-size: 12px; color: var(--text-3); }
-.mv__douban-review__text { font-size: 13.5px; color: var(--text-2); line-height: 1.6; margin: 0; }
-.mv__douban-review__text :deep(em) { background: rgba(210, 105, 30, .18); color: var(--accent); font-style: normal; border-radius: 3px; padding: 0 2px; }
+/* 口碑对比条：本片评分 vs 同类型均分（同一把尺子，长短可比） */
+.mv-cmp { display: grid; gap: 9px; margin: 4px 0 14px; max-width: 640px; }
+.mv-cmp__row { display: grid; grid-template-columns: 92px 1fr 46px; align-items: center; gap: 10px; }
+.mv-cmp__label { font-size: 12.5px; color: var(--text-2); }
+.mv-cmp__track {
+  height: 10px; border-radius: 999px; overflow: hidden;
+  background: var(--surface-2); border: 1px solid var(--border);
+}
+.mv-cmp__fill {
+  display: block; height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--light-brown), var(--warm-gray));
+  transition: width .4s ease;
+}
+.mv-cmp__fill.is-self { background: linear-gradient(90deg, var(--brand), var(--brand-2)); }
+.mv-cmp__val { font-size: 14px; color: var(--text-main); text-align: right; font-variant-numeric: tabular-nums; }
+.mv-cmp__note { font-size: 12.5px; color: var(--text-2); margin: 2px 0 0; }
+.mv-cmp__scope { color: var(--text-3); }
+
+/* 观众短评（豆瓣 / TMDB / Kaggle 真实原文，本片没有则给同类型） */
+.mv-voices__head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.mv-voices__head .block__title { margin: 0; }
+.mv-voices__count { font-size: 12.5px; color: var(--text-3); }
+.mv-voices__mood { margin: 12px 0 14px; max-width: 640px; }
+.mv-voices__bar {
+  display: flex; height: 12px; border-radius: 999px; overflow: hidden;
+  background: var(--surface-2); border: 1px solid var(--border);
+}
+.mv-voices__seg { display: block; height: 100%; transition: flex .35s ease; }
+.mv-voices__seg.is-pos { background: var(--positive); }
+.mv-voices__seg.is-neu { background: var(--neutral); opacity: .5; }
+.mv-voices__seg.is-neg { background: var(--negative); }
+.mv-voices__legend {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 14px;
+  margin-top: 8px; font-size: 12.5px; color: var(--text-2);
+}
+.mv-voices__legend .dot {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  margin-right: 5px; vertical-align: 1px;
+}
+.dot--pos { background: var(--positive); }
+.dot--neu { background: var(--neutral); }
+.dot--neg { background: var(--negative); }
+.mv-voices__avg { margin-left: auto; color: var(--text-3); }
+.mv-voices__lead {
+  font-size: 13.5px; color: var(--text-2); line-height: 1.7;
+  background: rgba(139, 115, 85, .07);
+  border-left: 3px solid var(--light-brown);
+  border-radius: 0 8px 8px 0; padding: 8px 12px; margin: 12px 0;
+}
+.mv-voices__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(258px, 1fr)); gap: 12px; }
+.mv-voice {
+  position: relative; padding: 12px 14px 14px;
+  border: 1px solid var(--border); border-radius: 12px;
+  background: var(--surface); box-shadow: var(--shadow-sm);
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+.mv-voice:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.mv-voice__head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.mv-voice__src {
+  font-size: 11.5px; font-weight: 700; padding: 1px 8px; border-radius: 999px;
+  background: rgba(139, 115, 85, .12); color: var(--accent-strong);
+}
+.mv-voice__src.is-douban { background: rgba(46, 155, 87, .12); color: #2e9b57; }
+.mv-voice__src.is-tmdb { background: rgba(1, 180, 228, .14); color: #0b7f9e; }
+.mv-voice__src.is-kaggle { background: rgba(32, 107, 196, .1); color: #1f5fa8; }
+.mv-voice__rating { margin-left: auto; font-size: 12.5px; font-weight: 700; color: var(--gold); }
+.mv-voice__text {
+  margin: 0; font-size: 13.5px; line-height: 1.72; color: var(--text-2);
+  display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical;
+  overflow: hidden; word-break: break-word;
+}
+.mv-voice__from { margin: 8px 0 0; font-size: 12px; color: var(--text-3); }
 .mv__link { color: var(--accent); text-decoration: none; }
 .mv__link:hover { text-decoration: underline; }
 

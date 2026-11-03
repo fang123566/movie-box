@@ -739,6 +739,61 @@ def build_similar_query(movie_id: str, index: str, size: int = 10) -> dict:
     }
 
 
+def build_similar_fallback_query(
+    movie_id: str,
+    genres: list[str],
+    rating: float | None,
+    year: int | None,
+    size: int = 10,
+) -> dict:
+    """相似影片的兜底召回：同类型 + 口碑同档 + 年代接近。
+
+    为什么需要它：more_like_this 靠文本重合度召回，简介短、类型单一
+    或中文名被切得稀碎的片子会直接召回 0 条 —— 详情页就变成
+    "暂无相似推荐"。这里改用结构化字段兜底，保证同一类型里总有片可看：
+
+    - filter：至少共享一个类型（types 为空则不限，退化为全库）
+    - gauss 衰减：评分越接近、年代越接近分越高（不是硬区间，避免一刀切）
+    - log1p(vote_count)：同分情况下更知名的片优先，避免推一堆无人问津的冷片
+
+    must_not 依旧排除自己 —— 兜底路径也绝不能把参考片推回给它自己。
+    """
+    functions: list[dict] = []
+    if rating is not None:
+        functions.append({
+            "gauss": {"vote_average": {
+                "origin": float(rating), "scale": 1.2, "offset": 0.4}},
+            "weight": 3,
+        })
+    if year is not None:
+        functions.append({
+            "gauss": {"release_year": {
+                "origin": int(year), "scale": 10, "offset": 2}},
+            "weight": 1,
+        })
+    functions.append({
+        "field_value_factor": {
+            "field": "vote_count", "modifier": "log1p", "missing": 1},
+        "weight": 0.5,
+    })
+
+    bool_query: dict = {"must_not": [{"ids": {"values": [movie_id]}}]}
+    if genres:
+        bool_query["filter"] = [{"terms": {"genres_zh": list(genres)}}]
+
+    return {
+        "size": size,
+        "query": {
+            "function_score": {
+                "query": {"bool": bool_query},
+                "functions": functions,
+                "score_mode": "sum",
+                "boost_mode": "multiply",
+            }
+        },
+    }
+
+
 def build_popular_query(m: float, c: float, size: int = 20) -> dict:
     """热门榜单：贝叶斯加权分（IMDb Top 250 的同款公式）。
 

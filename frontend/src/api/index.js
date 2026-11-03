@@ -121,6 +121,8 @@ export const api = {
   topics: (top = 30) => request(`/insights/topics${qs({ top })}`),
   lexicon: (top = 20) => request(`/insights/lexicon${qs({ top })}`),
   movieInsight: (id) => request(`/insights/movies/${encodeURIComponent(id)}`),
+  movieVoices: (id, size = 8) =>
+    request(`/insights/movies/${encodeURIComponent(id)}/voices${qs({ size })}`),
   polarizing: () => request('/insights/polarizing'),
   regions: () => request('/insights/regions'),
   story: () => request('/insights/story'),
