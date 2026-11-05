@@ -9,34 +9,45 @@
     ============================================================
   -->
   <div ref="root" class="rank-room">
-    <section class="rr__main float-card">
-      <BumpChart :matrix="matrix" />
-    </section>
-    <aside class="rr__side float-card">
-      <div class="rr__side-h">编辑精选 · 豆瓣口碑</div>
-      <div class="rr__side-body">
-        <DoubanPanel :douban="douban" />
-      </div>
-      <div class="rr__side-h rr__side-h--2">类型口碑榜</div>
-      <div class="rr__side-body rr__side-body--2">
-        <GenreRankCard :by-genre="sentiment?.by_genre || []" />
-      </div>
-    </aside>
-
-    <!-- 底部：导演口碑榜 + 高分片单（补足"数据要多一点"） -->
-    <div class="rr__bottom u-reveal">
-      <section class="float-card rr__cell">
-        <DirectorBoard :movies="movies" />
+    <RoomHero
+      icon="📈"
+      kicker="Word of Mouth"
+      title="口碑排名"
+      en="Who climbed, who slipped"
+      lead="各类型口碑的位次变化、登顶与跌落——谁在十年里稳居神坛，谁又悄悄滑出榜单。"
+      :tags="['口碑变迁', '编辑精选', '类型雷达']"
+      :stats="heroStats"
+    />
+    <div class="rr__grid">
+      <section class="rr__main float-card">
+        <BumpChart :matrix="matrix" />
       </section>
-      <section class="float-card rr__cell">
-        <PosterRail :movies="movies" />
+      <aside class="rr__side float-card">
+        <div class="rr__side-h">编辑精选 · 豆瓣口碑</div>
+        <div class="rr__side-body">
+          <DoubanPanel :douban="douban" />
+        </div>
+        <div class="rr__side-h rr__side-h--2">类型口碑榜</div>
+        <div class="rr__side-body rr__side-body--2">
+          <GenreRankCard :by-genre="sentiment?.by_genre || []" />
+        </div>
+      </aside>
+
+      <!-- 底部：导演口碑榜 + 高分片单（补足"数据要多一点"） -->
+      <div class="rr__bottom u-reveal">
+        <section class="float-card rr__cell">
+          <DirectorBoard :movies="movies" />
+        </section>
+        <section class="float-card rr__cell">
+          <PosterRail :movies="movies" />
+        </section>
+      </div>
+
+      <!-- 第四层：类型多维画像雷达（5 个维度由后端现算，可放大细读） -->
+      <section class="rr__deep u-reveal" style="--d:.1s">
+        <GenreRadarPanel :correlations="correlations" />
       </section>
     </div>
-
-    <!-- 第四层：类型多维画像雷达（5 个维度由后端现算，可放大细读） -->
-    <section class="rr__deep u-reveal" style="--d:.1s">
-      <GenreRadarPanel :correlations="correlations" />
-    </section>
   </div>
 </template>
 
@@ -45,30 +56,46 @@
 // 口碑排名：主图（BumpChart） + 侧栏精选（DoubanPanel + 类型口碑榜）
 //            + 底部（导演口碑榜 / 高分片单）
 // ============================================================
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import BumpChart from './BumpChart.vue'
 import DoubanPanel from './DoubanPanel.vue'
 import GenreRankCard from './GenreRankCard.vue'
 import DirectorBoard from './DirectorBoard.vue'
 import PosterRail from './PosterRail.vue'
 import GenreRadarPanel from './GenreRadarPanel.vue'
+import RoomHero from './RoomHero.vue'
 import { useReveal } from '../../composables/useReveal.js'
 
 const root = ref(null)
 useReveal(root)
 
-defineProps({
+const props = defineProps({
   matrix: { type: Object, default: null },
   douban: { type: Object, default: null },
   sentiment: { type: Object, default: null },
   movies: { type: Array, default: () => [] },
   correlations: { type: Object, default: null },
+  movieTotal: { type: Number, default: 0 },
+  reviewTotal: { type: Number, default: 0 },
 })
+
+const heroStats = computed(() => [
+  { value: props.movieTotal || 0, label: '收录影片' },
+  { value: props.reviewTotal || 0, label: '影评总数' },
+  { value: props.sentiment?.by_genre?.length || 0, label: '口碑类型维度' },
+])
 </script>
 
 <style scoped>
 .rank-room {
   height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.rr__grid {
+  flex: 1 1 0;
   min-height: 0;
   display: grid;
   grid-template-columns: 1fr 320px;
@@ -114,6 +141,6 @@ defineProps({
 .rr__side-body--2 { flex: 1 1 0; min-height: 0; overflow: auto; }
 
 @media (max-width: 1180px) {
-  .rank-room { grid-template-columns: 1fr 260px; }
+  .rr__grid { grid-template-columns: 1fr 260px; }
 }
 </style>

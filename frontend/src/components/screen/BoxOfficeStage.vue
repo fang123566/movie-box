@@ -10,6 +10,15 @@
 -->
 <template>
   <div ref="root" class="box-stage">
+    <RoomHero
+      icon="🎬"
+      kicker="Box Office"
+      title="票房分析"
+      en="Where the money went"
+      lead="把全球票房挂在一条绳上：从十亿俱乐部到投资回报，看清哪些电影真正赚到了钱、哪些只是叫好不叫座。"
+      :tags="['十亿俱乐部', '投资回报', '相框画廊']"
+      :stats="heroStats"
+    />
     <div class="box-stage__gallery">
       <BoxOfficeGallery
         :gallery="gallery"
@@ -19,6 +28,9 @@
         :pick="pick"
       />
     </div>
+
+    <RoomSection no="01" zh="全球票房画廊" en="Box Office Gallery" lead="全球票房 TOP 影片挂在一条绳上，滚轮沿绳浏览，点框看档案。" />
+
     <div class="box-stage__dock u-reveal">
       <div class="box-stage__cell box-stage__cell--rank">
         <BoxOfficeRank
@@ -36,6 +48,8 @@
       </div>
     </div>
 
+    <RoomSection no="02" zh="榜单与年度趋势" en="Top 10 · Yearly Trend" lead="左为十亿俱乐部榜单，右为各年度票房走势，看清水涨船高的年份。" />
+
     <!-- 第三层：票房总账 / 投资回报 / 类型票房（用户要求"数据要多一点"） -->
     <div class="box-stage__extras u-reveal" style="--d:.08s">
       <BoxExtras
@@ -48,6 +62,8 @@
       />
     </div>
 
+    <RoomSection no="03" zh="总账 · 回报 · 类型" en="Ledger · ROI · Genre" lead="从票房总账到投资回报，再到各类型票房占比，看清钱去了哪里。" />
+
     <!-- 第四层：相关矩阵 / 预算×票房散点回归（Pearson r 与 R² 由后端现算） -->
     <div class="box-stage__deep u-reveal" style="--d:.16s">
       <CorrelationPanel :correlations="correlations" />
@@ -59,12 +75,14 @@
 // ============================================================
 // 票房分析全宽舞台：画廊（主）+ 底部两栏配套（次）
 // ============================================================
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import BoxOfficeGallery from './BoxOfficeGallery.vue'
 import BoxOfficeRank from './BoxOfficeRank.vue'
 import BoxOfficeTrend from './BoxOfficeTrend.vue'
 import BoxExtras from './BoxExtras.vue'
 import CorrelationPanel from './CorrelationPanel.vue'
+import RoomHero from './RoomHero.vue'
+import RoomSection from './RoomSection.vue'
 import { useReveal } from '../../composables/useReveal.js'
 
 const root = ref(null)
@@ -82,6 +100,13 @@ const props = defineProps({
   correlations: { type: Object, default: null },
 })
 const emit = defineEmits(['pick'])
+
+// Hero 真实指标：影片数 / 全球总票房(美元→亿美元) / 票房峰值年
+const heroStats = computed(() => [
+  { value: props.totalMovies || 0, label: '收录影片' },
+  { value: Math.round(((props.totalRevenue || 0) / 1e8) * 10) / 10, decimals: 1, label: '全球总票房（亿美元）' },
+  { value: props.topYear || 0, label: '票房峰值年' },
+])
 </script>
 
 <style scoped>

@@ -116,14 +116,16 @@
                 :correlations="correlations"
                 @pick="boxPick = $event"
               />
-              <RankRoom v-else-if="view === 'rank'" :matrix="matrix" :douban="douban" :sentiment="sentiment" :movies="movies" :correlations="correlations" />
-              <FlowRoom v-else-if="view === 'flow'" :matrix="matrix" :trends="trends" :regions="regions" :douban="douban" :movies="movies" :flows="flows" />
+              <RankRoom v-else-if="view === 'rank'" :matrix="matrix" :douban="douban" :sentiment="sentiment" :movies="movies" :correlations="correlations" :movie-total="movieTotal" :review-total="reviewTotal" />
+              <FlowRoom v-else-if="view === 'flow'" :matrix="matrix" :trends="trends" :regions="regions" :douban="douban" :movies="movies" :flows="flows" :movie-total="movieTotal" :review-total="reviewTotal" />
               <DivergeRoom
                 v-else-if="view === 'diverge'"
                 :divergence="douban?.rating_divergence || []"
                 :polarizing="polarizing"
                 :douban="douban"
                 :correlations="correlations"
+                :movie-total="movieTotal"
+                :review-total="reviewTotal"
               />
             </Transition>
           </div>

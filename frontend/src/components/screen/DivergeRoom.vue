@@ -10,6 +10,15 @@
     ============================================================
   -->
   <div ref="root" class="diverge-room">
+    <RoomHero
+      icon="⚖️"
+      kicker="Two Platforms, One Film"
+      title="口碑分歧"
+      en="When scores disagree"
+      lead="豆瓣的口碑，和这里统计的口碑，不一定一致。把两个平台的评分并排对照，看清哪些电影被一方偏爱、被另一方冷落。"
+      :tags="['平台分歧', 'ROI 箱线', '评分断层']"
+      :stats="heroStats"
+    />
     <section class="dr__left float-card">
       <PolarizingBoard :polarizing="polarizing" />
     </section>
@@ -39,23 +48,32 @@
 // ============================================================
 // 口碑分歧：左 = 分化榜（A24 圆盘展）；右 = 分歧散点 + 豆瓣口碑 + 平台分歧榜
 // ============================================================
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import PolarizingBoard from './PolarizingBoard.vue'
 import DivergenceChart from './DivergenceChart.vue'
 import DoubanPanel from './DoubanPanel.vue'
 import GapBoard from './GapBoard.vue'
 import RoiBoxPanel from './RoiBoxPanel.vue'
+import RoomHero from './RoomHero.vue'
 import { useReveal } from '../../composables/useReveal.js'
 
 const root = ref(null)
 useReveal(root)
 
-defineProps({
+const props = defineProps({
   divergence: { type: Array, default: () => [] },
   polarizing: { type: Object, default: null },
   douban: { type: Object, default: null },
   correlations: { type: Object, default: null },
+  movieTotal: { type: Number, default: 0 },
+  reviewTotal: { type: Number, default: 0 },
 })
+
+const heroStats = computed(() => [
+  { value: props.divergence?.length || 0, label: '分歧影片' },
+  { value: props.movieTotal || 0, label: '收录影片' },
+  { value: props.reviewTotal || 0, label: '影评总数' },
+])
 </script>
 
 <style scoped>

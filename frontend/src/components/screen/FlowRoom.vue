@@ -9,9 +9,20 @@
     ============================================================
   -->
   <div ref="root" class="flow-room">
+    <RoomHero
+      icon="🌊"
+      kicker="Currents of Time"
+      title="年代流向"
+      en="Where genres drifted"
+      lead="类型与年代之间的影片流向：哪些类型在新时代崛起，哪些慢慢退潮——一张桑基图讲完九十年的取舍。"
+      :tags="['桑基流向', '年代胶片', '地区画像']"
+      :stats="heroStats"
+    />
+    <RoomSection no="01" zh="类型与年代流向" en="Genre × Era Flow" lead="一张桑基图，看清类型如何在年代之间迁移、哪些类型在新时代崛起。" />
     <section class="fr__top float-card">
       <SankeyFlow :matrix="matrix" />
     </section>
+    <RoomSection no="02" zh="年代故事 · 地区画像" en="Story · Regions" lead="每个年代的代表叙事，以及影片来自哪里。" />
     <div class="fr__bottom u-reveal">
       <section class="fr__cell float-card">
         <StoryTimeline :trends="trends" />
@@ -24,11 +35,13 @@
       </section>
     </div>
 
+    <RoomSection no="03" zh="年代胶片" en="Era Reels" lead="每个年代的代表作，横滑回看九十年的银幕记忆。" />
     <!-- 底部：年代胶片（每个年代的代表作，横滑可看） -->
     <section class="fr__rail float-card">
       <EraRail :movies="movies" />
     </section>
 
+    <RoomSection no="04" zh="三层流向 · 热力" en="Triple Flow · Heatmap" lead="类型→年代→口碑档的三层流向，叠加类型×年代均分热力。" />
     <!-- 第四层：类型→年代→口碑档三层桑基 + 类型×年代均分热力 -->
     <section class="fr__deep u-reveal" style="--d:.08s">
       <TripleFlowPanel :flows="flows" />
@@ -40,26 +53,36 @@
 // ============================================================
 // 年代流向：桑基主图 + 年代故事 / 预告覆盖 / 地区画像 三副卡 + 年代胶片
 // ============================================================
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import SankeyFlow from './SankeyFlow.vue'
 import StoryTimeline from './StoryTimeline.vue'
 import CoveragePanel from './CoveragePanel.vue'
 import RegionsPanel from './RegionsPanel.vue'
 import EraRail from './EraRail.vue'
 import TripleFlowPanel from './TripleFlowPanel.vue'
+import RoomHero from './RoomHero.vue'
+import RoomSection from './RoomSection.vue'
 import { useReveal } from '../../composables/useReveal.js'
 
 const root = ref(null)
 useReveal(root)
 
-defineProps({
+const props = defineProps({
   matrix: { type: Object, default: null },
   trends: { type: Object, default: null },
   regions: { type: Object, default: null },
   douban: { type: Object, default: null },
   movies: { type: Array, default: () => [] },
   flows: { type: Object, default: null },
+  movieTotal: { type: Number, default: 0 },
+  reviewTotal: { type: Number, default: 0 },
 })
+
+const heroStats = computed(() => [
+  { value: props.movieTotal || props.trends?.total_movies || 0, label: '收录影片' },
+  { value: props.reviewTotal || 0, label: '影评总数' },
+  { value: props.flows?.genres?.length || 0, label: '类型维度' },
+])
 </script>
 
 <style scoped>

@@ -991,10 +991,25 @@ body.u-body-lock .app-main > * { flex: 1; min-height: 0; }
 /* HUD 层改为流式：高度随数据内容增长，整页滚动 */
 .dashboard-container.is-scroll .hud-layer {
   position: relative;
+  z-index: 1;
   inset: auto;
   min-height: 100%;
   display: flex;
   flex-direction: column;
+}
+
+/* 跟随鼠标的暖光：复用父级已算好的 --mx/--my（viewport 坐标），
+   固定层、置于内容之下（z-index:0，hud-layer 为 1），只从纸卡缝隙透出，
+   形成"光标周围纸面发暖"的策展灯光——绝不盖住文字（soft-light 也只增亮）。 */
+.dashboard-container.is-scroll::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(380px circle at var(--mx, 50%) var(--my, 50%), rgba(255, 221, 150, 0.18), transparent 60%);
+  mix-blend-mode: soft-light;
+  transition: background-position .12s ease;
 }
 
 /* 顶栏吸顶：滚动看数据时状态栏始终在 */
@@ -1038,16 +1053,16 @@ body.u-body-lock .app-main > * { flex: 1; min-height: 0; }
 /* 2026-11-04：每间展厅多挂一层「深度分析图」，页面随之再加长约 250px，
    否则新层会把原有画廊 / 榜单挤扁（房间根节点是 height:100%，只认确定高度）。 */
 .dashboard-container.is-scroll .stage-panel__inner > .box-stage {
-  min-height: clamp(1220px, 140vh, 1450px);
+  min-height: clamp(1420px, 158vh, 1660px);
 }
 .dashboard-container.is-scroll .stage-panel__inner > .rank-room {
-  min-height: clamp(1190px, 136vh, 1420px);
+  min-height: clamp(1390px, 154vh, 1640px);
 }
 .dashboard-container.is-scroll .stage-panel__inner > .flow-room {
-  min-height: clamp(1250px, 143vh, 1480px);
+  min-height: clamp(1450px, 161vh, 1700px);
 }
 .dashboard-container.is-scroll .stage-panel__inner > .diverge-room {
-  min-height: clamp(1350px, 154vh, 1600px);
+  min-height: clamp(1550px, 172vh, 1800px);
 }
 .dashboard-container.is-scroll .stage-panel {
   flex: none;
