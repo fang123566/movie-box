@@ -95,11 +95,11 @@ const rows = computed(() => {
 .arm__row:nth-child(6) .arm__dot { animation-delay: 1.75s; }
 @keyframes arm-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.55; transform: scale(0.82); } }
 
-.arm__name { font-size: 11px; color: var(--u-text, #3A2E20); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.arm__bar { height: 4px; border-radius: 2px; background: rgba(154, 96, 40, 0.12); overflow: hidden; }
-.arm__bar i { display: block; height: 100%; border-radius: 2px; transition: width 0.9s cubic-bezier(0.22, 1, 0.36, 1); }
-.arm__n { font-family: var(--u-font-tech, "Orbitron"), sans-serif; font-size: 10px; color: var(--u-text-2, #7D6B52); text-align: right; }
-.arm__avg { font-family: var(--u-font-tech, "Orbitron"), sans-serif; font-size: 10px; font-weight: 700; color: #8B4513; text-align: right; }
+.arm__name { font-size: 12px; font-weight: 600; color: var(--u-text, #3A2E20); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.arm__bar { height: 5px; border-radius: 3px; background: rgba(154, 96, 40, 0.2); overflow: hidden; }
+.arm__bar i { display: block; height: 100%; border-radius: 3px; transition: width 0.9s cubic-bezier(0.22, 1, 0.36, 1); }
+.arm__n { font-family: var(--u-font-tech, "Orbitron"), sans-serif; font-size: 11px; font-weight: 600; color: #5D4E38; text-align: right; }
+.arm__avg { font-family: var(--u-font-tech, "Orbitron"), sans-serif; font-size: 11px; font-weight: 700; color: #8B4513; text-align: right; }
 
 @media (prefers-reduced-motion: reduce) {
   .arm__row { animation: none; }

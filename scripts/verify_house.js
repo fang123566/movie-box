@@ -21,6 +21,15 @@ function check(name, ok, extra = '') {
   else { fail++; console.log(`  ✗ ${name}${extra ? ' — ' + extra : ''}`) }
 }
 
+/** 2026-11-04：大厅改成「先打开电影盒子才能看到门」，所有 house 断言前先开封。
+ *  已开封（回大厅 / 深链返回）时直接跳过，不重复点击。 */
+async function openBox(p) {
+  const sealed = await p.evaluate(() => document.querySelector('.ih')?.classList.contains('is-sealed'))
+  if (!sealed) return
+  await p.evaluate(() => document.querySelector('.ih__box')?.click())
+  await sleep(1900)
+}
+
 ;(async () => {
   fs.mkdirSync(OUT, { recursive: true })
   const browser = await puppeteer.launch({
@@ -38,6 +47,7 @@ function check(name, ok, extra = '') {
   await page.goto(BASE + '/screen', { waitUntil: 'networkidle2', timeout: 60000 })
   await page.waitForSelector('.ih', { timeout: 20000 })
   await sleep(1400)
+  await openBox(page)
 
   /* ---------- 大厅（A24 编辑式首页：五间展厅作章节索引 + 主编精选栏） ---------- */
   const house = await page.evaluate(() => {
@@ -293,6 +303,7 @@ function check(name, ok, extra = '') {
   // 大厅洞察卡：house 模式底部托盘，真实分析结论 + 点卡直达展厅
   await page.goto(BASE + '/screen', { waitUntil: 'networkidle2', timeout: 60000 })
   await sleep(1500)
+  await openBox(page)
   const hi = await page.evaluate(() => {
     const cards = [...document.querySelectorAll('.hi__card')]
     return {
@@ -440,6 +451,7 @@ function check(name, ok, extra = '') {
   await m.goto(BASE + '/screen', { waitUntil: 'networkidle2', timeout: 60000 })
   await m.waitForSelector('.ih__room', { timeout: 20000 })
   await sleep(1200)
+  await openBox(m)
   const mob = await m.evaluate(() => {
     const r = document.querySelector('.ih').getBoundingClientRect()
     const doors = [...document.querySelectorAll('.ih__room')].map((d) => Math.round(d.getBoundingClientRect().width))

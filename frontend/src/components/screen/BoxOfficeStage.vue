@@ -47,6 +47,11 @@
         @pick="(g) => emit('pick', g)"
       />
     </div>
+
+    <!-- 第四层：相关矩阵 / 预算×票房散点回归（Pearson r 与 R² 由后端现算） -->
+    <div class="box-stage__deep">
+      <CorrelationPanel :correlations="correlations" />
+    </div>
   </div>
 </template>
 
@@ -58,6 +63,7 @@ import BoxOfficeGallery from './BoxOfficeGallery.vue'
 import BoxOfficeRank from './BoxOfficeRank.vue'
 import BoxOfficeTrend from './BoxOfficeTrend.vue'
 import BoxExtras from './BoxExtras.vue'
+import CorrelationPanel from './CorrelationPanel.vue'
 
 const props = defineProps({
   gallery: { type: Array, default: () => [] },
@@ -67,6 +73,8 @@ const props = defineProps({
   years: { type: Array, default: () => [] },
   /* 榜单点选联动：打开画廊里同一部的档案卡 */
   pick: { type: Object, default: null },
+  /* 深度分析：Pearson 相关矩阵 / 回归散点 */
+  correlations: { type: Object, default: null },
 })
 const emit = defineEmits(['pick'])
 </script>
@@ -120,4 +128,6 @@ const emit = defineEmits(['pick'])
 /* 第三层数据背板：固定高度，占页面下半屏（不再抢榜单的空间）。
    243px 才够 8 行 ROI + 抬头 + 脚注全部露出（实测 225 会裁掉最后一行）。 */
 .box-stage__extras { flex: 0 0 clamp(226px, 27vh, 250px); min-height: 0; }
+/* 第四层：相关矩阵 / 回归散点，固定高度、页面自然变长（不抢画廊与榜单） */
+.box-stage__deep { flex: 0 0 clamp(232px, 27vh, 272px); min-height: 0; }
 </style>

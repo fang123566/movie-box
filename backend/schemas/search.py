@@ -238,6 +238,24 @@ class NowPlayingResponse(BaseModel):
     items: list[NowPlayingHit] = Field(default_factory=list)
 
 
+class LibraryMatch(BaseModel):
+    """院线采集片在库内片库里的同名匹配（ES 真检索，不做模糊猜测）。"""
+    movie_id: str
+    title: str | None = None
+    release_year: int | None = None
+    rating: float | None = None
+    poster_url: str | None = None
+
+
+class NowPlayingDetail(NowPlayingHit):
+    """单条院线热映影片的站内采集档案。
+
+    点击首页卡片进入站内详情页，直接读爬虫落库的 ES 文档，
+    不再把访客送到源站；同时附上库内片库的真实关联。
+    """
+    library_match: LibraryMatch | None = None
+
+
 # ============================================================
 # TMDB 官方预告片（阶段 1g · 视频数据，走 tmdb_videos 索引）
 # ============================================================

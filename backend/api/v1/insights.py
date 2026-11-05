@@ -35,6 +35,18 @@ from backend.schemas.insights import (
     BoxOfficeItem,
     BoxOfficeResponse,
     BoxOfficeYearBucket,
+    CorrelationPoint,
+    CorrelationResponse,
+    FlowHeat,
+    FlowLayersResponse,
+    FlowLink,
+    FlowNode,
+    GenreProfile,
+    GraphLink,
+    GraphNode,
+    HallPoster,
+    HallPostersResponse,
+    KnowledgeGraphResponse,
     KeywordItem,
     MatrixCell,
     MatrixResponse,
@@ -46,6 +58,8 @@ from backend.schemas.insights import (
     Quote,
     RegionItem,
     RegionsResponse,
+    RegressionInfo,
+    RoiBox,
     ScoreRequest,
     ScoreResponse,
     SentimentBucket,
@@ -61,10 +75,20 @@ from backend.schemas.insights import (
     VoiceStats,
     WordHit,
 )
+from backend.services.insight_stats import (
+    lift as calc_lift,
+    linear_regression,
+    pearson,
+    quantiles,
+)
 from backend.services.query_builder import (
     build_box_office_years,
+    build_correlations_sample,
     build_decade_aggs,
+    build_flow_layers,
     build_genre_decade_matrix,
+    build_hall_posters,
+    build_knowledge_graph,
     build_polarizing,
     build_regions,
 )
@@ -236,7 +260,7 @@ async def sentiment_stats() -> SentimentStats:
     try:
         return await cache.get_or_set("insights:sentiment", _produce)
     except SearchUnavailable as exc:
-        raise es_unavailable(exc) from exc
+        raise _guard(exc) from exc
 
 
 @router.get("/trends", response_model=TrendsResponse, summary="年代趋势（影片数与均分）")
@@ -279,7 +303,7 @@ async def trends() -> TrendsResponse:
     try:
         return await cache.get_or_set("insights:trends", _produce)
     except SearchUnavailable as exc:
-        raise es_unavailable(exc) from exc
+        raise _guard(exc) from exc
 
 
 @router.get("/matrix", response_model=MatrixResponse, summary="类型×年代矩阵（动态图表数据源）")
@@ -323,7 +347,7 @@ async def genre_decade_matrix() -> MatrixResponse:
     try:
         return await cache.get_or_set("insights:matrix", _produce)
     except SearchUnavailable as exc:
-        raise es_unavailable(exc) from exc
+        raise _guard(exc) from exc
 
 
 # ============================================================
@@ -370,7 +394,9 @@ async def box_office(
                 title=str(s.get("title_zh") or s.get("title") or ""),
                 title_en=s.get("title_en"),
                 year=s.get("release_year"),
-                poster_url=s.get("poster_url"),
+                # 走站内图片代理：否则画廊 24 张相框直连 TMDB 图床，
+                # 网络一抖整页 ERR_CONNECTION_RESET、控制台一片红
+                poster_url=rewrite_poster_url(s.get("poster_url")),
                 revenue=revenue,
                 budget=budget,
                 roi=roi,
@@ -426,9 +452,10 @@ async def box_office(
         )
 
     try:
-        return await cache.get_or_set("insights:box-office", _produce)
+        # key 里带上 top：不同 top 参数不能共用同一份缓存（旧实现串数据）
+        return await cache.get_or_set(f"insights:box-office:{top}", _produce)
     except SearchUnavailable as exc:
-        raise es_unavailable(exc) from exc
+        raise _guard(exc) from exc
 
 
 # ============================================================
@@ -892,7 +919,7 @@ async def polarizing() -> PolarizingResponse:
     try:
         return await cache.get_or_set("insights:polarizing", _produce)
     except SearchUnavailable as exc:
-        raise es_unavailable(exc) from exc
+        raise _guard(exc) from exc
 
 
 @router.get("/regions", response_model=RegionsResponse, summary="地区画像（主出品国产量与口碑）")
@@ -926,7 +953,7 @@ async def regions() -> RegionsResponse:
     try:
         return await cache.get_or_set("insights:regions", _produce)
     except SearchUnavailable as exc:
-        raise es_unavailable(exc) from exc
+        raise _guard(exc) from exc
 
 
 @router.get("/story", response_model=StoryResponse, summary="馆长洞察卡（大厅结论卡叠）")
@@ -1005,4 +1032,455 @@ async def story() -> StoryResponse:
     try:
         return await cache.get_or_set("insights:story", _produce)
     except SearchUnavailable as exc:
-        raise es_unavailable(exc) from exc
+        raise _guard(exc) from exc
+
+
+# ============================================================
+# 深度分析（2026-11-04）：走廊片单 / 知识图谱 / 相关性 / 三层流向
+# ------------------------------------------------------------
+# 用户要求「数据要是真的分析得出来，而不是把现成的数据直接放上去」。
+# 这四个接口里没有一张写死的表：
+#   · hall-posters     每类型用 filter + top_hits 真选出代表片，并算高出类型均分多少
+#   · knowledge-graph  terms→terms 共现 + adjacency_matrix 交集，再算 lift 过滤噪声
+#   · correlations     取回样本后现算 Pearson / 最小二乘 R² / ROI 四分位
+#   · flows            类型→年代→口碑档三层桶，第三级是 range 聚合不是平均值贴图
+# 聚合体在 query_builder.py（可离线自检），统计量在 insight_stats.py（纯函数）。
+# ============================================================
+
+_TIER_NAMES = {
+    "under6": "6 分以下", "d6_7": "6–7 分", "d7_8": "7–8 分", "over8": "8 分以上",
+}
+_CORR_VARS = [
+    ("budget", "预算"), ("revenue", "票房"), ("vote_average", "评分"),
+    ("vote_count", "评价数"), ("runtime", "片长"),
+]
+
+
+def _num(value) -> float | None:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _int(value) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _list(value) -> list[str]:
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, (list, tuple)):
+        return [str(v) for v in value if v]
+    return []
+
+
+def _title(src: dict) -> str:
+    return str(src.get("title_zh") or src.get("title") or src.get("title_en") or "—")
+
+
+def _pos(value) -> float | None:
+    """预算/票房/片长里 0 代表「没采到」，必须当缺失而不是真的 0。"""
+    f = _num(value)
+    return f if f is not None and f > 0 else None
+
+
+@router.get("/hall-posters", response_model=HallPostersResponse,
+            summary="走廊悬挂片单（按类型真算出的代表影片）")
+async def hall_posters() -> HallPostersResponse:
+    """每个类型挑「票数达标的口碑代表」+「有票房的票房代表」，去重后给走廊挂。
+
+    poster_url 走 rewrite_poster_url，前端拿到就是 /api/v1/img 代理路径。
+    """
+    async def _produce() -> HallPostersResponse:
+        es = get_es().options(request_timeout=15)
+        try:
+            resp = await es.search(
+                index=settings.es_index_movies, **build_hall_posters())
+        except Exception as exc:  # noqa: BLE001
+            raise _guard(SearchUnavailable(f"{type(exc).__name__}: {exc}")) from exc
+
+        total = int(resp.get("hits", {}).get("total", {}).get("value") or 0)
+        items: list[HallPoster] = []
+        seen: set[str] = set()
+        for b in resp.get("aggregations", {}).get("by_genre", {}).get("buckets", []):
+            genre = str(b["key"])
+            gm = int(b["doc_count"])
+            ga = b.get("avg_rating", {}).get("value")
+            ga = round(float(ga), 2) if ga is not None else None
+            for role, sub in (("口碑代表", "rated"), ("票房代表", "grossing")):
+                hits = (b.get(sub, {}).get("best", {}).get("hits", {}).get("hits") or [])
+                # 每类型取前两名：一部片常常同时是多个类型的冠军，去重后
+                # 才凑得满走廊的 14 个挂位，且每张海报都是不同的真影片。
+                for rank, hit in enumerate(hits[:2]):
+                    src = hit.get("_source") or {}
+                    mid = str(src.get("movie_id") or hit.get("_id") or "")
+                    if not mid or mid in seen or len(items) >= 14:
+                        continue
+                    seen.add(mid)
+
+                    rating = _num(src.get("vote_average"))
+                    revenue = _int(src.get("revenue")) if _pos(src.get("revenue")) else None
+                    budget = _int(src.get("budget")) if _pos(src.get("budget")) else None
+                    roi = (round((revenue - budget) / budget, 3)
+                           if revenue and budget else None)
+                    gap = (round(rating - ga, 2)
+                           if rating is not None and ga is not None else None)
+                    place = f"TOP{rank + 1}"
+                    if role == "口碑代表":
+                        note = (f"{genre} {gm} 部里，票数达标的口碑 {place}"
+                                + (f" · 高出类型均分 {gap:.2f} 分" if gap is not None else ""))
+                    else:
+                        note = (f"{genre} 票房 {place}"
+                                + (f" · 全球 {revenue / 1e8:.1f} 亿美元" if revenue else ""))
+                    items.append(HallPoster(
+                        movie_id=mid,
+                        title=_title(src),
+                        title_en=src.get("title_en"),
+                        year=_int(src.get("release_year")),
+                        poster_url=rewrite_poster_url(src.get("poster_url")),
+                        genres=_list(src.get("genres_zh"))[:3],
+                        director=src.get("director"),
+                        cast=_list(src.get("cast"))[:2],
+                        vote_average=round(rating, 2) if rating is not None else None,
+                        vote_count=_int(src.get("vote_count")),
+                        revenue=revenue, budget=budget, roi=roi,
+                        genre=genre, role=role, genre_movies=gm,
+                        genre_avg_rating=ga, rating_gap=gap, note=note,
+                    ))
+        return HallPostersResponse(
+            total_movies=total, items=items,
+            note="片单由 ES 按类型聚合实时选出；每条结论都来自该类型的桶统计",
+        )
+
+    return await cache.get_or_set("insights:hall-posters", _produce)
+
+
+@router.get("/knowledge-graph", response_model=KnowledgeGraphResponse,
+            summary="影人 × 类型知识图谱（共现 + 提升度）")
+async def knowledge_graph() -> KnowledgeGraphResponse:
+    """先用一次聚合取回主类型名，再用 adjacency_matrix 求它们两两的交集。
+
+    ★ 只按共现次数排会被「剧情」这种大桶刷屏，所以每条边都算
+      lift = P(目标|源) / P(目标)；lift ≤ 1.02 的关系直接丢掉。
+    """
+    async def _produce() -> KnowledgeGraphResponse:
+        es = get_es().options(request_timeout=15)
+        try:
+            first = await es.search(
+                index=settings.es_index_movies, **build_knowledge_graph([]))
+            names = [str(b["key"]) for b in first.get("aggregations", {})
+                     .get("by_genre", {}).get("buckets", [])][:9]
+            resp = await es.search(
+                index=settings.es_index_movies, **build_knowledge_graph(names))
+        except Exception as exc:  # noqa: BLE001
+            raise _guard(SearchUnavailable(f"{type(exc).__name__}: {exc}")) from exc
+
+        aggs = resp.get("aggregations", {})
+        total = int(resp.get("hits", {}).get("total", {}).get("value") or 0) or 1
+        gcounts: dict[str, int] = {}
+        gavg: dict[str, float | None] = {}
+        for b in aggs.get("by_genre", {}).get("buckets", []):
+            name = str(b["key"])
+            gcounts[name] = int(b["doc_count"])
+            v = b.get("avg_rating", {}).get("value")
+            gavg[name] = round(float(v), 2) if v is not None else None
+
+        def counts(key: str) -> dict[str, int]:
+            return {str(b["key"]): int(b["doc_count"])
+                    for b in aggs.get(key, {}).get("buckets", [])}
+
+        def avgs(key: str) -> dict[str, float | None]:
+            out = {}
+            for b in aggs.get(key, {}).get("buckets", []):
+                v = b.get("avg_rating", {}).get("value")
+                out[str(b["key"])] = round(float(v), 2) if v is not None else None
+            return out
+
+        dcounts, acounts = counts("by_director"), counts("by_actor")
+        davg, aavg = avgs("by_director"), avgs("by_actor")
+
+        edges: list[GraphLink] = []
+        for b in aggs.get("by_genre", {}).get("buckets", []):
+            genre = str(b["key"])
+            base = gcounts.get(genre, 0)
+            for kind, sub, pool, prefix in (
+                ("genre-director", "directors", dcounts, "d"),
+                ("genre-actor", "actors", acounts, "a"),
+            ):
+                for t in b.get(sub, {}).get("buckets", []):
+                    name = str(t["key"])
+                    co = int(t["doc_count"])
+                    global_n = pool.get(name)          # 该导演/演员全库影片数
+                    if not global_n or co < 2:
+                        continue
+                    lv = calc_lift(co, base, global_n, total)
+                    if lv is None or lv <= 1.02:
+                        continue
+                    edges.append(GraphLink(
+                        source=f"g:{genre}", target=f"{prefix}:{name}",
+                        weight=co, lift=round(lv, 3), kind=kind,
+                    ))
+        for b in aggs.get("pairs", {}).get("buckets", []):
+            key = str(b["key"])
+            if "&" not in key:                        # 单个 filter 自身，不是边
+                continue
+            a, c = key.split("&", 1)
+            co = int(b["doc_count"])
+            lv = calc_lift(co, gcounts.get(a, 0), gcounts.get(c, 0), total)
+            if lv is None or lv <= 1.02 or co < 3:
+                continue
+            edges.append(GraphLink(
+                source=f"g:{a}", target=f"g:{c}",
+                weight=co, lift=round(lv, 3), kind="genre-genre",
+            ))
+        edges.sort(key=lambda e: (-e.lift, -e.weight))
+        edges = edges[:72]
+
+        used = {e.source for e in edges} | {e.target for e in edges}
+        nodes: list[GraphNode] = []
+        for name, cnt in gcounts.items():
+            nodes.append(GraphNode(id=f"g:{name}", name=name, kind="genre",
+                                   value=cnt, avg_rating=gavg.get(name)))
+        for prefix, pool, avg_map, kind in (
+            ("d", dcounts, davg, "director"), ("a", acounts, aavg, "actor"),
+        ):
+            for name, cnt in pool.items():
+                if f"{prefix}:{name}" in used:
+                    nodes.append(GraphNode(id=f"{prefix}:{name}", name=name,
+                                           kind=kind, value=cnt,
+                                           avg_rating=avg_map.get(name)))
+        strongest = edges[0] if edges else None
+        notes = [f"{total} 部影片 · {len(gcounts)} 个类型 · {len(edges)} 条显著共现边（lift>1.02）"]
+        if strongest:
+            def label(nid: str) -> str:
+                return next((n.name for n in nodes if n.id == nid), nid)
+            notes.append(f"最强关系：{label(strongest.source)} × {label(strongest.target)}"
+                         f" 共现 {strongest.weight} 次，是随机撞见的 {strongest.lift:.2f} 倍")
+        return KnowledgeGraphResponse(
+            nodes=nodes, links=edges, total_movies=total,
+            pair_count=len(edges), strongest=strongest, notes=notes,
+        )
+
+    return await cache.get_or_set("insights:knowledge-graph", _produce)
+
+
+@router.get("/correlations", response_model=CorrelationResponse,
+            summary="真实统计量：相关矩阵 / 回归 / ROI 四分位")
+async def correlations() -> CorrelationResponse:
+    """从 ES 取回全库样本，在 Python 里现算 Pearson、最小二乘 R²、ROI 分布。
+
+    0 值按缺失处理（预算/票房/片长的 0 是「没采到」不是真的零），
+    相关系数用 pairwise complete，样本不足 3 或方差为 0 返回 null。
+    """
+    async def _produce() -> CorrelationResponse:
+        es = get_es().options(request_timeout=15)
+        try:
+            resp = await es.search(
+                index=settings.es_index_movies, **build_correlations_sample())
+        except Exception as exc:  # noqa: BLE001
+            raise _guard(SearchUnavailable(f"{type(exc).__name__}: {exc}")) from exc
+
+        rows = [h.get("_source") or {} for h in resp.get("hits", {}).get("hits", [])]
+        cols: dict[str, list[float | None]] = {k: [] for k, _ in _CORR_VARS}
+        profile_rows: dict[str, list[dict]] = {}
+        for s in rows:
+            vals = {
+                "budget": _pos(s.get("budget")),
+                "revenue": _pos(s.get("revenue")),
+                "vote_average": _num(s.get("vote_average")),
+                "vote_count": _num(s.get("vote_count")),
+                "runtime": _pos(s.get("runtime")),
+            }
+            if vals["vote_average"] is not None and vals["vote_average"] <= 0:
+                vals["vote_average"] = None
+            for k, v in vals.items():
+                cols[k].append(v)
+            # 类型画像按「主类型」归组（genres_zh[0] 与 build_regions 口径一致）
+            g = (_list(s.get("genres_zh")) or ["其他"])[0]
+            profile_rows.setdefault(g, []).append({
+                "rating": vals["vote_average"],
+                "votes": vals["vote_count"],
+                "runtime": vals["runtime"],
+            })
+        matrix = []
+        for ka, _ in _CORR_VARS:
+            row = []
+            for kb, _ in _CORR_VARS:
+                r = 1.0 if ka == kb else pearson(cols[ka], cols[kb])
+                row.append(round(r, 3) if r is not None else None)
+            matrix.append(row)
+
+        pairs = [(b, r) for b, r in zip(cols["budget"], cols["revenue"])
+                 if b is not None and r is not None]
+        xs = [p[0] for p in pairs]
+        ys = [p[1] for p in pairs]
+        reg_raw = linear_regression(xs, ys)
+        reg = RegressionInfo(**{k: round(v, 4) if isinstance(v, float) else v
+                                for k, v in reg_raw.items()}) if reg_raw else None
+
+        scatter = []
+        for s in rows:
+            b, r = _pos(s.get("budget")), _pos(s.get("revenue"))
+            if b is None or r is None:
+                continue
+            scatter.append(CorrelationPoint(
+                x=float(b), y=float(r), rating=_num(s.get("vote_average")),
+                title=_title(s), movie_id=str(s.get("movie_id") or ""),
+            ))
+        scatter.sort(key=lambda p: -p.y)
+        scatter = scatter[:600]
+
+        by_genre: dict[str, list[float]] = {}
+        for s in rows:
+            b, r = _pos(s.get("budget")), _pos(s.get("revenue"))
+            if b is None or r is None:
+                continue
+            roi = (r - b) / b
+            if abs(roi) > 100:            # 预算极小导致的天文数字，口径上剔除
+                continue
+            g = (_list(s.get("genres_zh")) or ["其他"])[0]
+            by_genre.setdefault(g, []).append(roi)
+        boxes: list[RoiBox] = []
+        for g, vals in by_genre.items():
+            q = quantiles(vals)
+            if not q or q["count"] < 5:
+                continue
+            boxes.append(RoiBox(
+                genre=g, count=int(q["count"]),
+                **{k: round(float(v), 3)
+                   for k, v in q.items() if k != "count"},
+            ))
+        boxes.sort(key=lambda b: -b.median)
+
+        notes = []
+        best = None
+        for i, (ka, la) in enumerate(_CORR_VARS):
+            for j, (kb, lb) in enumerate(_CORR_VARS):
+                if j <= i or matrix[i][j] is None:
+                    continue
+                if best is None or abs(matrix[i][j]) > abs(best[0]):
+                    best = (matrix[i][j], la, lb)
+        if best:
+            notes.append(f"最强相关：{best[1]} × {best[2]}，r = {best[0]:+.2f}")
+        if reg:
+            notes.append(f"预算只能解释票房波动的 {reg.r2 * 100:.0f}%"
+                         f"（{reg.n} 部有完整预算/票房的影片，最小二乘）")
+        if boxes:
+            notes.append(f"投资回报中位数最高：{boxes[0].genre} "
+                         f"({boxes[0].median:.2f}×，{boxes[0].count} 部)")
+        roi_median = {b.genre: b.median for b in boxes}
+
+        def avg_of(rs: list[dict], key: str) -> float:
+            vs = [r[key] for r in rs if r[key] is not None]
+            return sum(vs) / len(vs) if vs else 0.0
+
+        profiles: list[GenreProfile] = []
+        for g, rs in profile_rows.items():
+            if len(rs) < 5:
+                continue
+            rated = [r["rating"] for r in rs if r["rating"] is not None]
+            profiles.append(GenreProfile(
+                genre=g, movies=len(rs),
+                avg_rating=round(avg_of(rs, "rating"), 2),
+                avg_votes=round(avg_of(rs, "votes")),
+                avg_runtime=round(avg_of(rs, "runtime")),
+                hit_rate=(round(sum(1 for v in rated if v >= 8) / len(rated), 3)
+                          if rated else 0.0),
+                median_roi=roi_median.get(g),
+            ))
+        profiles.sort(key=lambda p: -p.movies)
+
+        return CorrelationResponse(
+            variables=[k for k, _ in _CORR_VARS],
+            labels=[l for _, l in _CORR_VARS],
+            matrix=matrix, sample_size=len(rows), scatter=scatter,
+            regression=reg, roi_by_genre=boxes[:10],
+            profiles=profiles[:8], notes=notes,
+        )
+
+    return await cache.get_or_set("insights:correlations", _produce)
+
+
+@router.get("/flows", response_model=FlowLayersResponse,
+            summary="类型 → 年代 → 口碑档三层流向 + 类型×年代热力")
+async def flows() -> FlowLayersResponse:
+    """比旧的 build_genre_decade_matrix 多切一层 range(vote_average)。
+
+    桑基的第三级节点是「这一批片里有多少部进了 8 分档」，由 ES 桶给出，
+    不是把平均分涂个颜色充数。
+    """
+    async def _produce() -> FlowLayersResponse:
+        es = get_es().options(request_timeout=15)
+        try:
+            resp = await es.search(
+                index=settings.es_index_movies, **build_flow_layers())
+        except Exception as exc:  # noqa: BLE001
+            raise _guard(SearchUnavailable(f"{type(exc).__name__}: {exc}")) from exc
+
+        nodes: dict[str, FlowNode] = {}
+        link_sums: dict[tuple[str, str], int] = {}
+        heat: list[FlowHeat] = []
+        decades: set[int] = set()
+        genres: list[str] = []
+        over8: dict[str, int] = {}
+        totals: dict[str, int] = {}
+
+        def ensure(name: str, kind: str) -> None:
+            nodes.setdefault(name, FlowNode(name=name, kind=kind))
+
+        def add_link(source: str, target: str, value: int) -> None:
+            key = (source, target)
+            link_sums[key] = link_sums.get(key, 0) + value
+
+        for b in resp.get("aggregations", {}).get("by_genre", {}).get("buckets", []):
+            g = str(b["key"])
+            genres.append(g)
+            gn = f"G·{g}"
+            ensure(gn, "genre")
+            for d in b.get("by_decade", {}).get("buckets", []):
+                dec = int(float(d["key"]))
+                decades.add(dec)
+                # ★ 年代层跨类型共享：若按「类型×年代」各建一个节点，8 类型 ×7 年代
+                #   会碎成 56 个节点，桑基只剩一团细线（实拍确认）。三层语义就是
+                #   类型→年代→口碑档，细节由同接口的 heat 热力另给。
+                dn = f"D·{dec}s"
+                ensure(dn, "decade")
+                cnt = int(d["doc_count"])
+                add_link(gn, dn, cnt)
+                totals[g] = totals.get(g, 0) + cnt
+                avg = d.get("avg_rating", {}).get("value")
+                heat.append(FlowHeat(
+                    genre=g, decade=dec, movies=cnt,
+                    avg_rating=round(float(avg), 2) if avg is not None else None,
+                ))
+                for t in d.get("tier", {}).get("buckets", []):
+                    c = int(t["doc_count"])
+                    if c <= 0:
+                        continue
+                    key = str(t["key"])
+                    tn = f"T·{_TIER_NAMES.get(key, key)}"
+                    ensure(tn, "tier")
+                    add_link(dn, tn, c)
+                    if key == "over8":
+                        over8[g] = over8.get(g, 0) + c
+
+        links = [FlowLink(source=s, target=t, value=v)
+                 for (s, t), v in link_sums.items() if v > 0]
+        notes = []
+        ranked = [(g, c / totals[g]) for g, c in over8.items() if totals.get(g)]
+        if ranked:
+            g, p = max(ranked, key=lambda x: x[1])
+            notes.append(f"8 分以上占比最高的类型：{g}（{p * 100:.1f}%，"
+                         f"{over8[g]}/{totals[g]} 部）")
+        notes.append(f"{len(genres)} 个类型 · {len(decades)} 个年代 · "
+                     f"{len(links)} 条真实流向边")
+        return FlowLayersResponse(
+            nodes=list(nodes.values()), links=links, heat=heat,
+            decades=sorted(decades), genres=genres, notes=notes,
+        )
+
+    return await cache.get_or_set("insights:flows", _produce)

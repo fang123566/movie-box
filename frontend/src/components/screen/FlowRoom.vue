@@ -28,6 +28,11 @@
     <section class="fr__rail float-card">
       <EraRail :movies="movies" />
     </section>
+
+    <!-- 第四层：类型→年代→口碑档三层桑基 + 类型×年代均分热力 -->
+    <section class="fr__deep">
+      <TripleFlowPanel :flows="flows" />
+    </section>
   </div>
 </template>
 
@@ -40,6 +45,7 @@ import StoryTimeline from './StoryTimeline.vue'
 import CoveragePanel from './CoveragePanel.vue'
 import RegionsPanel from './RegionsPanel.vue'
 import EraRail from './EraRail.vue'
+import TripleFlowPanel from './TripleFlowPanel.vue'
 
 defineProps({
   matrix: { type: Object, default: null },
@@ -47,6 +53,7 @@ defineProps({
   regions: { type: Object, default: null },
   douban: { type: Object, default: null },
   movies: { type: Array, default: () => [] },
+  flows: { type: Object, default: null },
 })
 </script>
 
@@ -74,4 +81,6 @@ defineProps({
 
 /* 年代胶片：纸面接触印相条，固定高度铺满页面底部 */
 .fr__rail { flex: 0 0 clamp(178px, 21vh, 204px); min-height: 0; overflow: hidden; padding: 9px 14px; }
+/* 三层桑基 / 年代热力：固定高度，页面自然变长，不挤压上方主图 */
+.fr__deep { flex: 0 0 clamp(232px, 27vh, 278px); min-height: 0; }
 </style>

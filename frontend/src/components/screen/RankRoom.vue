@@ -32,6 +32,11 @@
         <PosterRail :movies="movies" />
       </section>
     </div>
+
+    <!-- 第四层：类型多维画像雷达（5 个维度由后端现算，可放大细读） -->
+    <section class="rr__deep">
+      <GenreRadarPanel :correlations="correlations" />
+    </section>
   </div>
 </template>
 
@@ -45,12 +50,14 @@ import DoubanPanel from './DoubanPanel.vue'
 import GenreRankCard from './GenreRankCard.vue'
 import DirectorBoard from './DirectorBoard.vue'
 import PosterRail from './PosterRail.vue'
+import GenreRadarPanel from './GenreRadarPanel.vue'
 
 defineProps({
   matrix: { type: Object, default: null },
   douban: { type: Object, default: null },
   sentiment: { type: Object, default: null },
   movies: { type: Array, default: () => [] },
+  correlations: { type: Object, default: null },
 })
 </script>
 
@@ -60,7 +67,7 @@ defineProps({
   min-height: 0;
   display: grid;
   grid-template-columns: 1fr 320px;
-  grid-template-rows: minmax(0, 1fr) clamp(222px, 26vh, 250px);
+  grid-template-rows: minmax(0, 1fr) clamp(222px, 26vh, 250px) clamp(232px, 27vh, 272px);
   gap: 14px;
 }
 .rr__main { grid-column: 1; grid-row: 1; min-height: 0; overflow: hidden; }
@@ -84,6 +91,7 @@ defineProps({
   gap: 14px;
 }
 .rr__cell { min-height: 0; overflow: hidden; padding: 10px 14px; }
+.rr__deep { grid-column: 1 / span 2; grid-row: 3; min-height: 0; }
 .rr__side-h {
   flex: none;
   font-size: 12.5px;

@@ -42,6 +42,11 @@
         均分 {{ avgRating.toFixed(1) }} · {{ armCount }} 条类型旋臂 · 悬停任意星星查看影片详情
       </div>
     </div>
+
+    <!-- 右下：影人×类型知识图谱（力导向网络，节点/边来自共现与 lift 真实计算） -->
+    <div v-if="knowledge?.nodes?.length" class="galaxy-graph">
+      <KnowledgeGraphPanel :knowledge="knowledge" />
+    </div>
   </div>
 </template>
 
@@ -51,6 +56,7 @@
 // ============================================================
 import EchoChamber from './EchoChamber.vue'
 import ArmLegend from './ArmLegend.vue'
+import KnowledgeGraphPanel from './KnowledgeGraphPanel.vue'
 
 const props = defineProps({
   avgRating: { type: Number, default: 0 },
@@ -59,6 +65,7 @@ const props = defineProps({
   lexicon: { type: Object, default: null },
   stats: { type: Object, default: null },
   movies: { type: Array, default: () => [] },
+  knowledge: { type: Object, default: null },
 })
 </script>
 
@@ -195,5 +202,26 @@ const props = defineProps({
   font-size: 10px;
   letter-spacing: 1.2px;
   color: var(--u-text-2);
+}
+
+/* ---------- 右下知识图谱卡 ----------
+   ★ 34 节点 / 72 边塞在 330×228 里会糊成一团（实拍确认）。放大到 400×300，
+     与右上的情感亭（限高 46%）、底部读图卡（限宽 600px）各占一块，不重叠。 */
+.galaxy-graph {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  width: 400px;
+  height: 300px;
+  z-index: 3;
+}
+/* 更高特异性覆盖基础规则：给右下图腾出竖向空间、收窄底部读图卡避免压住图谱 */
+.galaxy-float .galaxy-echo { max-height: 40%; }
+.galaxy-float .galaxy-card { max-width: min(560px, calc(100% - 32px)); }
+@media (max-width: 1180px) {
+  .galaxy-graph { width: 320px; height: 240px; }
+}
+@media (max-width: 950px) {
+  .galaxy-graph { display: none; }
 }
 </style>

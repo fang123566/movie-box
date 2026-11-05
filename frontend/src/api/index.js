@@ -107,8 +107,9 @@ export const api = {
   suggest: (q, size = 8) => request(`/search/suggest${qs({ q, size })}`),
   getMovie: (id) => request(`/search/movies/${encodeURIComponent(id)}`),
 
-  // ---- 豆瓣数据源 ----
+  // ---- 院线热映（站内采集档案，卡片点击不出站） ----
   nowPlaying: () => request('/douban/nowplaying'),
+  nowPlayingDetail: (id) => request(`/douban/nowplaying/${encodeURIComponent(id)}`),
   doubanInsights: () => request('/douban/insights'),
   trailers: (tmdbId) => request(`/search/trailers/${encodeURIComponent(tmdbId)}`),
 
@@ -126,6 +127,11 @@ export const api = {
   polarizing: () => request('/insights/polarizing'),
   regions: () => request('/insights/regions'),
   story: () => request('/insights/story'),
+  // 深度分析（2026-11-04）：全部由 ES 聚合 + 后端现算得出
+  hallPosters: () => request('/insights/hall-posters'),
+  knowledgeGraph: () => request('/insights/knowledge-graph'),
+  correlations: () => request('/insights/correlations'),
+  flows: () => request('/insights/flows'),
   scoreText: (text, lang = 'auto') =>
     request('/insights/sentiment', { method: 'POST', body: { text, lang } }),
 

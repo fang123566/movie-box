@@ -34,7 +34,11 @@
       class="house-layer"
       :rooms="VIEWS"
       :cards="story?.cards || []"
+      :posters="hallPosters"
+      :start-open="houseOpened"
       @enter="enterRoom"
+      @open="houseOpened = true"
+      @close="houseOpened = false"
     />
 
     <!-- ========== 上层：悬浮 HUD（大厅模式下只留顶栏，其余区块收起） ========== -->
@@ -58,8 +62,9 @@
         <button class="top-bar__btn" type="button" @click="toggleFs">⛶ 全屏</button>
       </header>
 
-      <!-- 大厅模式：悬浮导览图按钮（itomdev 汉堡钮位，常驻可见，不会进展厅就找不到北） -->
-      <button v-show="mode === 'house'" class="house-map-btn" type="button" @click="mapOpen = true">
+      <!-- 大厅模式：悬浮导览图按钮（itomdev 汉堡钮位）。合盒阶段先不给导览图，
+           否则五间展厅会从地图里提前泄露；开封后才出现 -->
+      <button v-show="mode === 'house' && houseOpened" class="house-map-btn" type="button" @click="mapOpen = true">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14" /></svg>
         <span>导览图</span>
       </button>
@@ -93,6 +98,7 @@
           :lexicon="lexicon"
           :stats="galaxyStats"
           :movies="movies"
+          :knowledge="knowledge"
         />
 
         <!-- 其余展厅：每间各自一套排版（专属舞台组件），玻璃面板仅作承托 -->
@@ -107,15 +113,17 @@
                 :top-year="boxOffice?.top_year"
                 :years="boxOffice?.years || []"
                 :pick="boxPick"
+                :correlations="correlations"
                 @pick="boxPick = $event"
               />
-              <RankRoom v-else-if="view === 'rank'" :matrix="matrix" :douban="douban" :sentiment="sentiment" :movies="movies" />
-              <FlowRoom v-else-if="view === 'flow'" :matrix="matrix" :trends="trends" :regions="regions" :douban="douban" :movies="movies" />
+              <RankRoom v-else-if="view === 'rank'" :matrix="matrix" :douban="douban" :sentiment="sentiment" :movies="movies" :correlations="correlations" />
+              <FlowRoom v-else-if="view === 'flow'" :matrix="matrix" :trends="trends" :regions="regions" :douban="douban" :movies="movies" :flows="flows" />
               <DivergeRoom
                 v-else-if="view === 'diverge'"
                 :divergence="douban?.rating_divergence || []"
                 :polarizing="polarizing"
                 :douban="douban"
+                :correlations="correlations"
               />
             </Transition>
           </div>
@@ -205,6 +213,10 @@ const douban = ref(null)    // 豆瓣联合洞察（/douban/insights，并入本
 const story = ref(null)        // 大厅馆长洞察卡（/insights/story）
 const polarizing = ref(null)   // 观众评分分化榜（/insights/polarizing）
 const regions = ref(null)      // 国家/地区画像（/insights/regions）
+const hallPosters = ref([])    // 走廊挂画：按类型聚合挑出的真实代表片
+const knowledge = ref(null)    // 影人×类型知识图谱（共现 + lift）
+const correlations = ref(null) // Pearson 矩阵 / 回归 / ROI 四分位 / 类型画像
+const flows = ref(null)        // 类型→年代→口碑档三层流向 + 热力
 
 const reviewTotal = computed(() => sentiment.value?.total || 0)
 const movieTotal = computed(() => trends.value?.total_movies || 0)
@@ -267,6 +279,8 @@ const view = ref('galaxy')
 /* house = 大厅（六扇门）；room = 展厅（图表 + 两翼面板）。
    每个展厅相互独立：进展厅后只能「回大厅」再进其他门，展厅内不提供跳到其他展厅的入口。 */
 const mode = ref('house')
+/* 是否已经开过电影盒子：合盒首屏不显示导览图，回大厅/深链返回时保持已开状态 */
+const houseOpened = ref(false)
 const roomIdx = computed(() => Math.max(0, VIEWS.findIndex((v) => v.key === view.value)))
 const curView = computed(() => VIEWS[roomIdx.value] || VIEWS[0])
 
@@ -423,6 +437,7 @@ onMounted(async () => {
   if (q && VIEWS.some((v) => v.key === q)) {
     view.value = q
     mode.value = 'room'
+    houseOpened.value = true   // 深链已经进过展厅，回大厅不必再开一次盒
     playRoomIntro()
   }
 
@@ -456,6 +471,11 @@ onMounted(async () => {
   api.story().then((d) => { story.value = d }).catch(() => {})
   api.polarizing().then((d) => { polarizing.value = d }).catch(() => {})
   api.regions().then((d) => { regions.value = d }).catch(() => {})
+  // 深度分析四路（2026-11-04）：全部 ES 实时聚合 / 现算统计，失败静默降级
+  api.hallPosters().then((d) => { hallPosters.value = d?.items || [] }).catch(() => {})
+  api.knowledgeGraph().then((d) => { knowledge.value = d }).catch(() => {})
+  api.correlations().then((d) => { correlations.value = d }).catch(() => {})
+  api.flows().then((d) => { flows.value = d }).catch(() => {})
 
   // 底部真实影评流（中文化：lang=zh 走索引 lang 字段，库内共 87 条中文影评，
   // 取两页拿全；CJK 比例兜底过滤防脏数据；sentiment 为 None 的中文影评用

@@ -3,7 +3,7 @@
 // 首页 —— 清单「首页」模块：
 //   Hero（主副标题 + 640×56 大搜索框 + 热门词 + 🎲 盲盒入口 + 右侧光盘展台）
 //   🔥 大家都在看（横向滚动海报，悬停上浮 4px）
-//   🎞️ 院线热映 Top 10
+//   🎞️ 院线热映 Top 10（卡片一律进站内采集档案，不外链源站）
 //   🎬 怪兽合影（静态设计稿图片）
 // ============================================================
 import { computed, onMounted, ref } from 'vue'
@@ -26,14 +26,14 @@ onMounted(async () => {
       // /recommend/popular 返回 {items:[{movie: MovieHit}]} 包装结构，解包成扁平对象
       hot.value = (d?.items || d?.hits || []).map((it) => it.movie || it)
     }).catch(() => {}),
-    // 院线热映 Top 10：豆瓣「正在热映」榜，按豆瓣评分降序取前 10（多为库外院线新片）
+    // 院线热映 Top 10：爬虫采集的榜单，按评分降序取前 10
     api.nowPlaying().then((d) => { nowPlaying.value = d?.items || [] }).catch(() => {}),
   ]
   await Promise.all(jobs)
   loading.value = false
 })
 
-// 院线热映：按豆瓣评分降序取前 10（评分缺失的沉底，按票数兜底）
+// 院线热映：按采集评分降序取前 10（评分缺失的沉底，按票数兜底）
 const nowTop = computed(() => {
   const list = [...nowPlaying.value]
   list.sort((a, b) => {
@@ -44,10 +44,6 @@ const nowTop = computed(() => {
   })
   return list.slice(0, 10)
 })
-
-function doubanUrl(id) {
-  return id ? `https://movie.douban.com/subject/${id}/` : 'https://movie.douban.com/cinema/nowplaying/'
-}
 
 // 热门搜索词（功能清单 P1）：从「大家都在看」的类型频次派生前 6 个，
 // 数据驱动、不写死；加载完热门列表前隐藏该行。
@@ -121,24 +117,23 @@ function goMovie(m) {
         </div>
       </section>
 
-      <!-- ===== 院线热映 Top 10（豆瓣正在热映榜，多为库外院线新片） ===== -->
+      <!-- ===== 院线热映 Top 10（爬虫采集榜单，点击进站内档案页） ===== -->
       <section class="block">
         <div class="block__head">
           <h2 class="block__title">🎞️ 院线热映 <span class="block__sub">Top 10</span></h2>
-          <span class="block__note">豆瓣正在热映榜 · 按评分排序</span>
+          <span class="block__note">站内采集档案 · 按评分排序</span>
         </div>
 
         <div v-if="loading" class="horizon">
           <div v-for="i in 10" :key="i" class="skeleton" style="width:150px;height:290px;border-radius:14px" />
         </div>
         <div v-else-if="nowTop.length" class="horizon">
-          <a
+          <router-link
             v-for="(m, i) in nowTop"
             :key="m.douban_id"
             class="npc"
-            :href="doubanUrl(m.douban_id)"
-            target="_blank"
-            rel="noopener noreferrer"
+            :to="`/nowplaying/${encodeURIComponent(m.douban_id)}`"
+            :aria-label="`查看《${m.title || '影片'}》的站内采集档案`"
           >
             <div class="npc__poster">
               <img
@@ -150,6 +145,7 @@ function goMovie(m) {
               >
               <div v-else class="npc__ph">{{ (m.title || '影').slice(0, 1) }}</div>
               <span class="npc__rank" :class="{ 'npc__rank--gold': i < 3 }">No.{{ i + 1 }}</span>
+              <div class="npc__mask">查看采集档案</div>
               <div class="npc__shade">
                 <span v-if="m.douban_rating" class="npc__score">★ {{ m.douban_rating.toFixed(1) }}</span>
                 <span v-if="m.duration" class="npc__dur">{{ m.duration }}</span>
@@ -160,7 +156,7 @@ function goMovie(m) {
               <div class="npc__meta">{{ m.release_year || '—' }} · {{ (m.region || []).join('/') || '—' }}</div>
               <div v-if="(m.director || []).length" class="npc__meta npc__meta--dim">{{ m.director.join(' / ') }}</div>
             </div>
-          </a>
+          </router-link>
         </div>
         <p v-else class="empty p-16">暂无院线热映数据</p>
       </section>

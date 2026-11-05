@@ -134,11 +134,15 @@ async function shot(page, name) {
     console.log('== 5. 洞察页 / 说明页 ==')
     await page.goto(`${BASE}/insights`, { waitUntil: 'networkidle2' })
     await settle(1800)
-    // /insights 重定向到 /screen；2026-10-22 起 /screen 默认是「洞察馆大厅」（六扇门入口），
-    // 面板文案只在展厅里 —— 断言大屏数据要用深链 ?room=galaxy 直接进展厅
+    // /insights 重定向到 /screen；2026-10-22 起 /screen 默认是「洞察馆大厅」。
+    // 2026-11-04 起大厅首屏是合盒状态（先打开电影盒子才看得到门），
+    // 旧断言用的 .ih__door 早已随 CSS 3D 走廊改成 .ih__room，这里同步到新契约。
     const insPath = new URL(page.url()).pathname
-    const atHouse = await page.evaluate(() => !!document.querySelector('.ih__door'))
-    check('/insights 重定向到大屏大厅', insPath === '/screen' && atHouse, `${insPath} house=${atHouse}`)
+    const atHouse = await page.evaluate(() => {
+      const ih = document.querySelector('.ih')
+      return !!ih && ih.classList.contains('is-sealed') && document.querySelectorAll('.ih__room').length === 5
+    })
+    check('/insights 重定向到合盒大厅（先开盒才见门）', insPath === '/screen' && atHouse, `${insPath} house=${atHouse}`)
     await page.goto(`${BASE}/screen?room=galaxy`, { waitUntil: 'networkidle2' })
     await settle(2400)
     await shot(page, '14-insights.png')

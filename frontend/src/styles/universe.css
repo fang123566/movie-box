@@ -1035,17 +1035,19 @@ body.u-body-lock .app-main > * { flex: 1; min-height: 0; }
 
 /* 每间展厅按自己的内容量给不同最小高度：页面本来就能滚，
    给足高度才不会把新加的数据块挤进老面板里（2026-11-02 加数据后调整）。 */
+/* 2026-11-04：每间展厅多挂一层「深度分析图」，页面随之再加长约 250px，
+   否则新层会把原有画廊 / 榜单挤扁（房间根节点是 height:100%，只认确定高度）。 */
 .dashboard-container.is-scroll .stage-panel__inner > .box-stage {
-  min-height: clamp(980px, 112vh, 1180px);
+  min-height: clamp(1220px, 140vh, 1450px);
 }
 .dashboard-container.is-scroll .stage-panel__inner > .rank-room {
-  min-height: clamp(950px, 108vh, 1150px);
+  min-height: clamp(1190px, 136vh, 1420px);
 }
 .dashboard-container.is-scroll .stage-panel__inner > .flow-room {
-  min-height: clamp(1010px, 115vh, 1210px);
+  min-height: clamp(1250px, 143vh, 1480px);
 }
 .dashboard-container.is-scroll .stage-panel__inner > .diverge-room {
-  min-height: clamp(1110px, 126vh, 1330px);
+  min-height: clamp(1350px, 154vh, 1600px);
 }
 .dashboard-container.is-scroll .stage-panel {
   flex: none;
@@ -1099,8 +1101,10 @@ body.u-body-lock .app-main > * { flex: 1; min-height: 0; }
   transition: transform .32s ease, box-shadow .32s ease;
 }
 .dashboard-container.is-scroll .float-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 20px 42px rgba(120, 90, 50, .2), inset 0 1px 0 rgba(255, 255, 255, .85);
+  /* 克制的 3D 微倾斜：卡片像被指尖掀起一点点（透视 + 轻微抬升），
+     不挂 preserve-3d，子元素命中不受影响 */
+  transform: perspective(900px) rotateX(1.6deg) translateY(-3px);
+  box-shadow: 0 22px 46px rgba(120, 90, 50, .22), inset 0 1px 0 rgba(255, 255, 255, .85);
 }
 
 @media (prefers-reduced-motion: reduce) {

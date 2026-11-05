@@ -40,10 +40,16 @@ const routes = [
     meta: { title: '足迹地图' },
   },
   {
-    // 院线热映不再单独成页：Top 10 已并入首页；豆瓣联合数据也并入影评洞察大屏。
-    // 旧链接优雅重定向，避免收藏夹 / 外链 404。
+    // 院线热映榜 Top 10 在首页；点卡片进「站内采集档案」详情页。
+    // 这里一律是自己的页面，不再把访客外链到数据源站点。
     path: '/nowplaying',
     redirect: '/',
+  },
+  {
+    path: '/nowplaying/:id',
+    name: 'nowplaying-detail',
+    component: () => import('../views/NowPlayingView.vue'),
+    meta: { title: '院线热映档案' },
   },
   {
     // 豆瓣 × 预告片 联合洞察已并入影评洞察大屏（/screen）。

@@ -862,3 +862,147 @@ def build_for_you_query(
             }
         },
     }
+
+
+# ============================================================
+# 深度分析（2026-11-04）：走廊片单 / 知识图谱 / 相关性 / 三层流向
+# ------------------------------------------------------------
+# 用户红线：「数据要是真的分析得出来，而不是把现成的数据直接放上去」。
+# 这里只定义 ES 聚合 DSL 与统计口径，**结果一律由 ES 实时算出**；
+# 本模块依旧是纯函数：不联网、不读配置，可离线自检。
+# ============================================================
+
+_POSTER_SOURCE = [
+    "movie_id", "title", "title_zh", "title_en", "release_year",
+    "genres_zh", "director", "cast", "poster_url",
+    "vote_average", "vote_count", "revenue", "budget", "primary_country",
+]
+
+
+def build_hall_posters(genre_size: int = 8, min_votes: int = 500) -> dict:
+    """走廊悬挂片单：每个类型挑「口碑代表」+「票房代表」各一部。
+
+    ★ 为什么不是简单 TOP N：top_hits 直接按 vote_average 排会被 143 人
+      打 9.9 分的冷门片占满（实测库里就有）。所以口碑代表先过
+      `vote_count >= min_votes` 的 filter 聚合，票房代表先过 revenue>0 —— 
+      两条边的样本口径都是聚合算出来的，不是前端写死的片单。
+      每个桶同时给 avg_rating / doc_count，供 API 层算「高出类型均分多少」。
+    """
+    return {
+        "size": 0,
+        "track_total_hits": True,
+        "aggs": {
+            "by_genre": {
+                "terms": {"field": "genres_zh", "size": genre_size, "min_doc_count": 8},
+                "aggs": {
+                    "avg_rating": {"avg": {"field": "vote_average"}},
+                    "rated": {
+                        "filter": {"range": {"vote_count": {"gte": min_votes}}},
+                        "aggs": {"best": {"top_hits": {
+                            "size": 2,
+                            "sort": [{"vote_average": "desc"}, {"vote_count": "desc"}],
+                            "_source": _POSTER_SOURCE,
+                        }}},
+                    },
+                    "grossing": {
+                        "filter": {"range": {"revenue": {"gt": 0}}},
+                        "aggs": {"best": {"top_hits": {
+                            "size": 2,
+                            "sort": [{"revenue": "desc"}],
+                            "_source": _POSTER_SOURCE,
+                        }}},
+                    },
+                },
+            }
+        },
+    }
+
+
+def build_knowledge_graph(genre_names: list[str], genre_size: int = 9,
+                          director_size: int = 4, actor_size: int = 5) -> dict:
+    """影人 × 类型知识图谱：共现边 + 类型两两共现（adjacency_matrix）。
+
+    边权不是拍脑袋：
+      · 类型→导演 / 类型→演员：ES `terms → terms` 的实际共现 doc_count，
+        API 层再算 lift = P(节点|类型) / P(节点)，滤掉只是「拍得多」的噪声；
+      · 类型↔类型：adjacency_matrix 的 filters 两两求交，doc_count 即
+        同时挂在两个类型下的影片数（实测「剧情&动作」=67）。
+    """
+    filters = {name: {"term": {"genres_zh": name}} for name in genre_names}
+    return {
+        "size": 0,
+        "track_total_hits": True,
+        "aggs": {
+            "by_genre": {
+                "terms": {"field": "genres_zh", "size": genre_size,
+                          "min_doc_count": 5},
+                "aggs": {
+                    "avg_rating": {"avg": {"field": "vote_average"}},
+                    "directors": {"terms": {"field": "director.kw", "size": director_size}},
+                    "actors": {"terms": {"field": "cast.kw", "size": actor_size}},
+                },
+            },
+            "by_director": {
+                "terms": {"field": "director.kw", "size": 16, "min_doc_count": 2},
+                "aggs": {"avg_rating": {"avg": {"field": "vote_average"}}},
+            },
+            "by_actor": {
+                "terms": {"field": "cast.kw", "size": 20, "min_doc_count": 3},
+                "aggs": {"avg_rating": {"avg": {"field": "vote_average"}}},
+            },
+            # 无 filters 时 ES 会 400，调用方必须先拿类型名；这里给个保底
+            "pairs": {"adjacency_matrix": {"filters": filters or {
+                "剧情": {"term": {"genres_zh": "剧情"}},
+            }}},
+        },
+    }
+
+
+def build_correlations_sample(size: int = 1000) -> dict:
+    """相关性分析样本：只拉需要的 10 个字段，全量在 Python 里算统计量。
+
+    库内约 500 部影片，一次取回 <1MB；比写一堆 ES pipeline 聚合更直观，
+    也和 search_service.get_douban_insights() 的既有口径一致。
+    """
+    return {
+        "size": size,
+        "track_total_hits": True,
+        "query": {"match_all": {}},
+        "_source": [
+            "movie_id", "title", "title_zh", "release_year", "genres_zh",
+            "vote_average", "vote_count", "revenue", "budget", "runtime",
+        ],
+    }
+
+
+def build_flow_layers(genre_size: int = 8) -> dict:
+    """三层流向：类型 → 年代 → 口碑档，外加类型×年代热力所需的均分。
+
+    与旧 build_genre_decade_matrix（两层）不同：这里再往下切一层
+    `range(vote_average)`，得到「某类型的某个年代里，多少部进了 8 分档」，
+    桑基才有真实的第三级节点，而不是把平均值当数据摊上去。
+    """
+    return {
+        "size": 0,
+        "track_total_hits": False,
+        "aggs": {
+            "by_genre": {
+                "terms": {"field": "genres_zh", "size": genre_size, "min_doc_count": 8},
+                "aggs": {
+                    "by_decade": {
+                        "histogram": {"field": "release_year", "interval": 10,
+                                      "min_doc_count": 1},
+                        "aggs": {
+                            "avg_rating": {"avg": {"field": "vote_average"}},
+                            "tier": {"range": {"field": "vote_average", "ranges": [
+                                {"key": "under6", "to": 6},
+                                {"key": "d6_7", "from": 6, "to": 7},
+                                {"key": "d7_8", "from": 7, "to": 8},
+                                {"key": "over8", "from": 8},
+                            ]}},
+                        },
+                    }
+                },
+            }
+        },
+    }

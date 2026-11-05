@@ -343,3 +343,148 @@ class StoryCard(BaseModel):
 
 class StoryResponse(BaseModel):
     cards: list[StoryCard] = Field(default_factory=list)
+
+
+# ============================================================
+# 深度分析（2026-11-04）：走廊片单 / 知识图谱 / 相关性 / 三层流向
+# ------------------------------------------------------------
+# 与前面「把 ES 桶摊平成表」的模型不同：这一组字段里凡是带 gap / lift /
+# r / q1 / roi / percentile 的，都是后端现场算出来的统计量，不是索引原字段。
+# ============================================================
+
+
+class HallPoster(BaseModel):
+    """走廊里挂着的一部真实影片 + 它「为什么挂在这里」的分析结论。"""
+
+    movie_id: str
+    title: str
+    title_en: str | None = None
+    year: int | None = None
+    poster_url: str | None = Field(default=None, description="已改写为 /api/v1/img 代理路径")
+    genres: list[str] = Field(default_factory=list)
+    director: str | None = None
+    cast: list[str] = Field(default_factory=list)
+    vote_average: float | None = None
+    vote_count: int | None = None
+    revenue: int | None = None
+    budget: int | None = None
+    roi: float | None = Field(default=None, description="(票房-预算)/预算，后端现算")
+    genre: str = Field(description="它是哪个类型的代表")
+    role: str = Field(description="口碑代表 / 票房代表")
+    genre_movies: int = 0
+    genre_avg_rating: float | None = None
+    rating_gap: float | None = Field(default=None, description="该片评分 - 类型均分")
+    note: str = Field(default="", description="一句由聚合结果生成的结论")
+
+
+class HallPostersResponse(BaseModel):
+    total_movies: int = 0
+    items: list[HallPoster] = Field(default_factory=list)
+    note: str | None = None
+
+
+class GraphNode(BaseModel):
+    id: str
+    name: str
+    kind: Literal["genre", "director", "actor"]
+    value: int = Field(default=0, description="该节点涉及的影片数")
+    avg_rating: float | None = None
+
+
+class GraphLink(BaseModel):
+    source: str
+    target: str
+    weight: int = Field(description="ES 聚合出的真实共现次数")
+    lift: float = Field(description="P(目标|源)/P(目标)，>1 才是有效关系")
+    kind: Literal["genre-director", "genre-actor", "genre-genre"]
+
+
+class KnowledgeGraphResponse(BaseModel):
+    nodes: list[GraphNode] = Field(default_factory=list)
+    links: list[GraphLink] = Field(default_factory=list)
+    total_movies: int = 0
+    pair_count: int = 0
+    strongest: GraphLink | None = None
+    notes: list[str] = Field(default_factory=list)
+
+
+class CorrelationPoint(BaseModel):
+    x: float = Field(description="预算（美元）")
+    y: float = Field(description="票房（美元）")
+    rating: float | None = None
+    title: str
+    movie_id: str
+
+
+class RegressionInfo(BaseModel):
+    slope: float
+    intercept: float
+    r2: float
+    n: int
+    x_mean: float
+    y_mean: float
+
+
+class RoiBox(BaseModel):
+    """某类型 ROI 的四分位分布（真算，不是平均值一根柱子）。"""
+
+    genre: str
+    count: int
+    min: float
+    q1: float
+    median: float
+    q3: float
+    max: float
+    iqr: float
+
+
+class GenreProfile(BaseModel):
+    """类型多维画像：全部由样本现算（均值 / 高分率 / ROI 中位数）。"""
+
+    genre: str
+    movies: int
+    avg_rating: float
+    avg_votes: float
+    avg_runtime: float
+    hit_rate: float = Field(description="评分 ≥8 的比例")
+    median_roi: float | None = None
+
+
+class CorrelationResponse(BaseModel):
+    variables: list[str] = Field(default_factory=list)
+    labels: list[str] = Field(default_factory=list)
+    matrix: list[list[float | None]] = Field(default_factory=list)
+    sample_size: int = 0
+    scatter: list[CorrelationPoint] = Field(default_factory=list)
+    regression: RegressionInfo | None = None
+    roi_by_genre: list[RoiBox] = Field(default_factory=list)
+    profiles: list[GenreProfile] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
+
+
+class FlowNode(BaseModel):
+    name: str
+    kind: Literal["genre", "decade", "tier"]
+    value: int = 0
+
+
+class FlowLink(BaseModel):
+    source: str
+    target: str
+    value: int
+
+
+class FlowHeat(BaseModel):
+    genre: str
+    decade: int
+    movies: int
+    avg_rating: float | None = None
+
+
+class FlowLayersResponse(BaseModel):
+    nodes: list[FlowNode] = Field(default_factory=list)
+    links: list[FlowLink] = Field(default_factory=list)
+    heat: list[FlowHeat] = Field(default_factory=list)
+    decades: list[int] = Field(default_factory=list)
+    genres: list[str] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)

@@ -20,6 +20,13 @@ import {
   PieChart,
   ScatterChart,
   SankeyChart,
+  // 2026-11-04 深度分析：知识图谱（graph）、相关矩阵/类型热力（heatmap）、
+  // 类型画像（radar）、ROI 四分位（boxplot）都用得上。注册表是全局单例，
+  // 不注册就写 type:'graph' 会报 "Series graph is not imported"。
+  GraphChart,
+  HeatmapChart,
+  RadarChart,
+  BoxplotChart,
 } from 'echarts/charts'
 
 import {
@@ -28,6 +35,12 @@ import {
   LegendComponent,
   TitleComponent,
   AxisPointerComponent,
+  VisualMapComponent,
+  ToolboxComponent,
+  MarkLineComponent,
+  RadarComponent,
+  DatasetComponent,
+  DataZoomComponent,
 } from 'echarts/components'
 
 import { LabelLayout, UniversalTransition } from 'echarts/features'
@@ -47,11 +60,21 @@ use([
   PieChart,
   ScatterChart,
   SankeyChart,
+  GraphChart,
+  HeatmapChart,
+  RadarChart,
+  BoxplotChart,
   GridComponent,
   TooltipComponent,
   LegendComponent,
   TitleComponent,
   AxisPointerComponent,
+  VisualMapComponent,
+  ToolboxComponent,
+  MarkLineComponent,
+  RadarComponent,
+  DatasetComponent,
+  DataZoomComponent,
   LabelLayout,
   UniversalTransition,
 ])

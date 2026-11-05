@@ -27,6 +27,11 @@
         <GapBoard :divergence="divergence" />
       </section>
     </div>
+
+    <!-- 第四层：各类型 ROI 四分位箱线（q1/中位/q3 由后端现算） -->
+    <section class="dr__deep">
+      <RoiBoxPanel :correlations="correlations" />
+    </section>
   </div>
 </template>
 
@@ -38,11 +43,13 @@ import PolarizingBoard from './PolarizingBoard.vue'
 import DivergenceChart from './DivergenceChart.vue'
 import DoubanPanel from './DoubanPanel.vue'
 import GapBoard from './GapBoard.vue'
+import RoiBoxPanel from './RoiBoxPanel.vue'
 
 defineProps({
   divergence: { type: Array, default: () => [] },
   polarizing: { type: Object, default: null },
   douban: { type: Object, default: null },
+  correlations: { type: Object, default: null },
 })
 </script>
 
@@ -52,11 +59,15 @@ defineProps({
   min-height: 0;
   display: grid;
   grid-template-columns: 1fr 1fr;
+  grid-template-rows: minmax(0, 1fr) clamp(232px, 27vh, 278px);
   gap: 14px;
 }
-.dr__left { min-height: 0; overflow: hidden; }
+.dr__left { grid-column: 1; grid-row: 1; min-height: 0; overflow: hidden; }
+.dr__deep { grid-column: 1 / span 2; grid-row: 2; min-height: 0; }
 
 .dr__right {
+  grid-column: 2;
+  grid-row: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;

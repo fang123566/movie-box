@@ -100,11 +100,7 @@ const trailerEmbed = computed(() => {
   return (official || any)?.url || ''
 })
 const hasTrailer = computed(() => trailers.value.length > 0)
-const doubanSearchUrl = computed(() => {
-  const t = movie.value?.title_zh || movie.value?.title || ''
-  if (!t) return ''
-  return `https://search.douban.com/movie/subject_search?search_text=${encodeURIComponent(t)}`
-})
+// 本站是爬虫采集 + 站内检索：短评缺档时引导去站内影评洞察，不外链数据源站点。
 async function loadTrailers(id) {
   trailers.value = []
   const tid = movie.value?.tmdb_id
@@ -371,7 +367,7 @@ function share() {
         </div>
         <p v-else class="text-3 text-sm">
           本片和同类型影片都还没有收录短评。
-          <a :href="doubanSearchUrl" target="_blank" rel="noopener noreferrer" class="mv__link">去豆瓣看看 ›</a>
+          <router-link class="mv__link" to="/screen">去影评洞察看看 ›</router-link>
         </p>
       </section>
 

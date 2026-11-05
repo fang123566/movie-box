@@ -404,6 +404,100 @@
 .npc__meta--dim {
   display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden;
 }
+/* 悬停提示：点击进「站内采集档案」，不是跳去源站；底部留出评分条 */
+.npc__mask {
+  position: absolute; inset: 0 0 34px 0; z-index: 2;
+  display: flex; align-items: center; justify-content: center;
+  color: #FFF6E9; font-size: 12px; font-weight: 700; letter-spacing: .04em;
+  background: linear-gradient(160deg, rgba(139, 69, 19, .76), rgba(60, 40, 20, .72));
+  opacity: 0; transition: opacity .2s ease; pointer-events: none;
+}
+.npc:hover .npc__mask, .npc:focus-visible .npc__mask { opacity: 1; }
+
+/* ---------- 院线热映 · 站内采集档案页（/nowplaying/:id） ----------
+   严格沿用原系统棕金：白卡片 + 暖棕虚线 + 金色星级，不引大屏的暖白纸感。 */
+.npv { padding: 22px 0 44px; }
+.npv__crumb {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  font-size: 12px; color: var(--text-3); margin-bottom: 20px;
+}
+.npv__crumb a { color: var(--brand); text-decoration: none; }
+.npv__crumb a:hover { text-decoration: underline; }
+.npv__crumb b {
+  color: var(--text-main); font-weight: 700; max-width: 260px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.npv__loading { padding: 90px 0; text-align: center; color: var(--text-2); }
+.npv__hero {
+  display: grid; grid-template-columns: 240px 1fr; gap: 30px;
+  padding: 26px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+}
+.npv__poster {
+  aspect-ratio: 2 / 3; border-radius: 14px; overflow: hidden;
+  background: linear-gradient(160deg, var(--light-brown), var(--warm-gray));
+  box-shadow: 0 10px 28px rgba(107, 79, 58, .22);
+}
+.npv__poster img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.npv__ph {
+  width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+  font-size: 78px; font-weight: 800; color: rgba(255, 255, 255, .85);
+}
+.npv__main { min-width: 0; }
+.npv__tag {
+  display: inline-block; padding: 4px 12px; border-radius: 999px;
+  font-size: 11px; font-weight: 700; letter-spacing: .04em; color: #FFF6E9;
+  background: linear-gradient(160deg, #A0522D, #8B4513);
+}
+.npv__title {
+  margin: 12px 0 10px; font-family: "Kaiti SC", KaiTi, serif;
+  font-size: clamp(26px, 3.4vw, 38px); line-height: 1.25; color: var(--dark-brown);
+}
+.npv__score { display: flex; align-items: baseline; gap: 12px; margin-bottom: 18px; }
+.npv__score b { font-size: 32px; color: var(--gold); line-height: 1; }
+.npv__score span { font-size: 13px; color: var(--text-2); }
+.npv__facts { margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 26px; }
+.npv__facts > div { display: flex; gap: 10px; padding-bottom: 8px; border-bottom: 1px dashed var(--border-strong); }
+.npv__facts dt { flex: 0 0 66px; font-size: 12px; color: var(--text-3); }
+.npv__facts dd { margin: 0; font-size: 13px; color: var(--text-main); line-height: 1.5; }
+.npv__ops { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+.npv__ops .btn { text-decoration: none; }
+/* auto-fit：库外片没有「双源对照」时两张卡自动各占一半，不留空列 */
+.npv__cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; margin-top: 18px; }
+.npv__card {
+  padding: 18px; min-height: 172px; background: var(--surface-2);
+  border: 1px dashed var(--border-strong); border-radius: var(--radius);
+}
+.npv__card-h { margin: 0 0 12px; font-size: 15px; font-weight: 700; color: var(--dark-brown); }
+.npv__kv {
+  display: flex; justify-content: space-between; gap: 10px;
+  padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12px;
+}
+.npv__kv span { color: var(--text-3); flex: 0 0 auto; }
+.npv__kv b { color: var(--text-main); font-weight: 600; text-align: right; word-break: break-all; }
+.npv__card-note { margin: 12px 0 0; font-size: 11.5px; line-height: 1.6; color: var(--text-2); }
+.npv__duo { display: flex; align-items: center; justify-content: space-around; gap: 8px; padding: 6px 0 14px; }
+.npv__duo > div { text-align: center; }
+.npv__duo span { display: block; font-size: 11px; color: var(--text-3); }
+.npv__duo b { font-size: 27px; color: var(--gold); }
+.npv__duo i { font-style: normal; font-size: 12px; color: var(--text-3); }
+.npv__duo-note { margin: 0; font-size: 12px; line-height: 1.6; color: var(--text-2); }
+.npv__duo-note b { color: var(--brand); }
+.npv__link-line { margin: 0 0 10px; font-size: 12.5px; line-height: 1.6; color: var(--text-main); }
+.npv__inline {
+  display: inline-block; margin-top: 10px; font-size: 12px; color: var(--brand);
+  text-decoration: none; border-bottom: 1px dashed currentColor;
+}
+.npv__peers-block { margin-top: 26px; }
+@media (max-width: 900px) {
+  .npv__hero { grid-template-columns: 180px 1fr; padding: 18px; gap: 18px; }
+  .npv__facts { grid-template-columns: 1fr; }
+}
+@media (max-width: 620px) {
+  .npv__hero { grid-template-columns: 1fr; }
+  .npv__poster { width: 160px; justify-self: center; }
+}
 
 /* ---------- 影评速览 / 迷你趋势 ---------- */
 .rvlist { display: flex; flex-direction: column; gap: 10px; }

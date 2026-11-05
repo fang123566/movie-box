@@ -19,6 +19,8 @@ from backend.schemas.search import (
     MovieHit,
     MovieSearchRequest,
     MovieSearchResponse,
+    LibraryMatch,
+    NowPlayingDetail,
     NowPlayingHit,
     NowPlayingResponse,
     RatingDivergencePoint,
@@ -373,6 +375,75 @@ async def get_nowplaying(size: int = 50) -> NowPlayingResponse:
         # 同一批采集，取最新一条的采集时间作为榜单时间
         latest = max((it.collected_at for it in items if it.collected_at), default=None)
     return NowPlayingResponse(count=len(items), collected_at=latest, items=items)
+
+
+def _norm_title(value: str | None) -> str:
+    """片名归一化：去空白、常见标点与书名号后小写。
+
+    只用于「采集片 ↔ 库内片」的严格比对；不参与召回，召回仍走 ES 分词。
+    归一化后完全相同才算匹配，避免《XX》误连到同名续集 / 相似片。
+    """
+    return re.sub(
+        r"[\s:：·・\-—_,，.。!！?？'\"“”‘’()（）\[\]【】《》]",
+        "", str(value or ""),
+    ).lower()
+
+
+async def _library_match_by_title(title: str | None) -> LibraryMatch | None:
+    """采集片是否在库内片库有同名影片：先 ES 召回，再 Python 严格比对。
+
+    这是详情页的增强信息，失败/超时不影响档案本身，故异常一律吞掉返回 None。
+    """
+    key = _norm_title(title)
+    if not key:
+        return None
+    try:
+        es = get_es().options(request_timeout=6)
+        raw = await es.search(
+            index=settings.es_index_movies,
+            query={"multi_match": {
+                "query": str(title), "type": "best_fields",
+                "fields": ["title^4", "title_zh^4", "title_en^2", "original_title^2"],
+            }},
+            size=8,
+            _source=["movie_id", "title", "title_zh", "title_en", "original_title",
+                     "release_year", "vote_average", "poster_url"],
+            track_total_hits=False,
+        )
+    except Exception:  # noqa: BLE001
+        return None
+    for h in raw.get("hits", {}).get("hits", []):
+        src = h.get("_source") or {}
+        fields = ("title", "title_zh", "title_en", "original_title")
+        if not any(_norm_title(src.get(f)) == key for f in fields):
+            continue
+        return LibraryMatch(
+            movie_id=src.get("movie_id") or h.get("_id") or "",
+            title=src.get("title") or src.get("title_zh"),
+            release_year=src.get("release_year"),
+            rating=src.get("vote_average"),
+            poster_url=rewrite_poster_url(src.get("poster_url")),
+        )
+    return None
+
+
+async def get_nowplaying_detail(douban_id: str) -> NowPlayingDetail | None:
+    """按 _id 读单条爬虫采集档案（站内详情页用）。
+
+    与榜单接口同源：都是 douban_nowplaying 索引里已经落库的采集结果，
+    不在 Web 请求里现爬源站；找不到返回 None，由 API 层转 404。
+    """
+    try:
+        es = get_es().options(request_timeout=8)
+        raw = await es.get(index=settings.es_index_douban_nowplaying, id=douban_id)
+    except Exception as exc:  # noqa: BLE001
+        if getattr(exc, "status_code", None) == 404:
+            return None
+        raise SearchUnavailable(f"{type(exc).__name__}: {exc}") from exc
+    hit = {"_id": raw.get("_id"), "_source": raw.get("_source") or {}}
+    detail = NowPlayingDetail(**_to_nowplaying_hit(hit).model_dump())
+    detail.library_match = await _library_match_by_title(detail.title)
+    return detail
 
 
 def _applied_filters(req: MovieSearchRequest) -> dict:

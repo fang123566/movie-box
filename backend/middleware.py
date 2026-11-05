@@ -45,10 +45,16 @@ from common.settings import settings
 # 参与「登录失败计次」的路径前缀（响应 401/409 记一次失败，200 清零）
 _AUTH_PATHS = ("/api/v1/auth/login", "/api/v1/auth/register")
 
-# 探针与文档路径：不限流、不打请求日志
+# 探针、文档与「缓存型静态资源」：不限流、不打请求日志。
+# ★ /api/v1/img 是海报代理：白名单域名 + 1 天浏览器缓存，本身不是业务 API。
+#   走廊一屏就挂 14 张海报，画廊还会再拉一批；若和业务接口共用
+#   rate_limit_general_per_minute 这一个桶，用户快速逛几间展厅就会把
+#   自己的图片打成 429（控制台一片红、海报裂图）。这里单独放行，
+#   安全边界仍由 img.py 的域名白名单 + 响应体大小限制守住。
 _EXEMPT_PREFIXES = (
     "/api/v1/health/live",
     "/api/v1/health/ready",
+    "/api/v1/img",
     "/docs",
     "/redoc",
     "/openapi.json",
