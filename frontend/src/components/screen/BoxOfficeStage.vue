@@ -9,7 +9,7 @@
   整间房不再有左右两翼，区别于其他"左图右表"的展厅。
 -->
 <template>
-  <div class="box-stage">
+  <div ref="root" class="box-stage">
     <div class="box-stage__gallery">
       <BoxOfficeGallery
         :gallery="gallery"
@@ -19,7 +19,7 @@
         :pick="pick"
       />
     </div>
-    <div class="box-stage__dock">
+    <div class="box-stage__dock u-reveal">
       <div class="box-stage__cell box-stage__cell--rank">
         <BoxOfficeRank
           :gallery="gallery"
@@ -37,7 +37,7 @@
     </div>
 
     <!-- 第三层：票房总账 / 投资回报 / 类型票房（用户要求"数据要多一点"） -->
-    <div class="box-stage__extras">
+    <div class="box-stage__extras u-reveal" style="--d:.08s">
       <BoxExtras
         :gallery="gallery"
         :total-movies="totalMovies"
@@ -49,7 +49,7 @@
     </div>
 
     <!-- 第四层：相关矩阵 / 预算×票房散点回归（Pearson r 与 R² 由后端现算） -->
-    <div class="box-stage__deep">
+    <div class="box-stage__deep u-reveal" style="--d:.16s">
       <CorrelationPanel :correlations="correlations" />
     </div>
   </div>
@@ -59,11 +59,16 @@
 // ============================================================
 // 票房分析全宽舞台：画廊（主）+ 底部两栏配套（次）
 // ============================================================
+import { ref } from 'vue'
 import BoxOfficeGallery from './BoxOfficeGallery.vue'
 import BoxOfficeRank from './BoxOfficeRank.vue'
 import BoxOfficeTrend from './BoxOfficeTrend.vue'
 import BoxExtras from './BoxExtras.vue'
 import CorrelationPanel from './CorrelationPanel.vue'
+import { useReveal } from '../../composables/useReveal.js'
+
+const root = ref(null)
+useReveal(root)
 
 const props = defineProps({
   gallery: { type: Array, default: () => [] },

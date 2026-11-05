@@ -9,7 +9,7 @@
     两张内容气质迥异，并排对照，一眼看懂"两个平台的口碑不一定一致"。
     ============================================================
   -->
-  <div class="diverge-room">
+  <div ref="root" class="diverge-room">
     <section class="dr__left float-card">
       <PolarizingBoard :polarizing="polarizing" />
     </section>
@@ -29,7 +29,7 @@
     </div>
 
     <!-- 第四层：各类型 ROI 四分位箱线（q1/中位/q3 由后端现算） -->
-    <section class="dr__deep">
+    <section class="dr__deep u-reveal">
       <RoiBoxPanel :correlations="correlations" />
     </section>
   </div>
@@ -39,11 +39,16 @@
 // ============================================================
 // 口碑分歧：左 = 分化榜（A24 圆盘展）；右 = 分歧散点 + 豆瓣口碑 + 平台分歧榜
 // ============================================================
+import { ref } from 'vue'
 import PolarizingBoard from './PolarizingBoard.vue'
 import DivergenceChart from './DivergenceChart.vue'
 import DoubanPanel from './DoubanPanel.vue'
 import GapBoard from './GapBoard.vue'
 import RoiBoxPanel from './RoiBoxPanel.vue'
+import { useReveal } from '../../composables/useReveal.js'
+
+const root = ref(null)
+useReveal(root)
 
 defineProps({
   divergence: { type: Array, default: () => [] },

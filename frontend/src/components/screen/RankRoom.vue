@@ -8,7 +8,7 @@
     手绘纸框 + 硬阴影，直接铺在暖白纸面上（不含左右两翼）。
     ============================================================
   -->
-  <div class="rank-room">
+  <div ref="root" class="rank-room">
     <section class="rr__main float-card">
       <BumpChart :matrix="matrix" />
     </section>
@@ -24,7 +24,7 @@
     </aside>
 
     <!-- 底部：导演口碑榜 + 高分片单（补足"数据要多一点"） -->
-    <div class="rr__bottom">
+    <div class="rr__bottom u-reveal">
       <section class="float-card rr__cell">
         <DirectorBoard :movies="movies" />
       </section>
@@ -34,7 +34,7 @@
     </div>
 
     <!-- 第四层：类型多维画像雷达（5 个维度由后端现算，可放大细读） -->
-    <section class="rr__deep">
+    <section class="rr__deep u-reveal" style="--d:.1s">
       <GenreRadarPanel :correlations="correlations" />
     </section>
   </div>
@@ -45,12 +45,17 @@
 // 口碑排名：主图（BumpChart） + 侧栏精选（DoubanPanel + 类型口碑榜）
 //            + 底部（导演口碑榜 / 高分片单）
 // ============================================================
+import { ref } from 'vue'
 import BumpChart from './BumpChart.vue'
 import DoubanPanel from './DoubanPanel.vue'
 import GenreRankCard from './GenreRankCard.vue'
 import DirectorBoard from './DirectorBoard.vue'
 import PosterRail from './PosterRail.vue'
 import GenreRadarPanel from './GenreRadarPanel.vue'
+import { useReveal } from '../../composables/useReveal.js'
+
+const root = ref(null)
+useReveal(root)
 
 defineProps({
   matrix: { type: Object, default: null },

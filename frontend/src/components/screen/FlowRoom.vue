@@ -8,11 +8,11 @@
     像展览里的两块说明牌，不再塞进左右两翼。
     ============================================================
   -->
-  <div class="flow-room">
+  <div ref="root" class="flow-room">
     <section class="fr__top float-card">
       <SankeyFlow :matrix="matrix" />
     </section>
-    <div class="fr__bottom">
+    <div class="fr__bottom u-reveal">
       <section class="fr__cell float-card">
         <StoryTimeline :trends="trends" />
       </section>
@@ -30,7 +30,7 @@
     </section>
 
     <!-- 第四层：类型→年代→口碑档三层桑基 + 类型×年代均分热力 -->
-    <section class="fr__deep">
+    <section class="fr__deep u-reveal" style="--d:.08s">
       <TripleFlowPanel :flows="flows" />
     </section>
   </div>
@@ -40,12 +40,17 @@
 // ============================================================
 // 年代流向：桑基主图 + 年代故事 / 预告覆盖 / 地区画像 三副卡 + 年代胶片
 // ============================================================
+import { ref } from 'vue'
 import SankeyFlow from './SankeyFlow.vue'
 import StoryTimeline from './StoryTimeline.vue'
 import CoveragePanel from './CoveragePanel.vue'
 import RegionsPanel from './RegionsPanel.vue'
 import EraRail from './EraRail.vue'
 import TripleFlowPanel from './TripleFlowPanel.vue'
+import { useReveal } from '../../composables/useReveal.js'
+
+const root = ref(null)
+useReveal(root)
 
 defineProps({
   matrix: { type: Object, default: null },

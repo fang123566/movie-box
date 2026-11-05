@@ -27,8 +27,14 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   for (const room of ['galaxy', 'box', 'rank', 'flow', 'diverge']) {
     await page.goto(`${BASE}/screen?room=${room}`, { waitUntil: 'networkidle2', timeout: 45000 })
     await sleep(2200)
-    await page.evaluate(() => window.scrollTo(0, 0))
-    await sleep(400)
+    // 逐屏下滚触发 .u-reveal 滚动揭示（is-in 常驻不回退），再回顶等过渡完成后整页拍，
+    // 否则首屏以下的揭示板块在 fullPage 截图里仍是初始透明态
+    await page.evaluate(async () => {
+      const h = document.documentElement.scrollHeight
+      for (let y = 0; y <= h; y += 500) { window.scrollTo(0, y); await new Promise((r) => setTimeout(r, 90)) }
+      window.scrollTo(0, 0)
+    })
+    await sleep(900)
     await page.screenshot({ path: `${OUT}/review-${room}.png`, fullPage: true })
     console.log(`shot review-${room}.png`)
   }

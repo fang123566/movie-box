@@ -1096,6 +1096,21 @@ body.u-body-lock .app-main > * { flex: 1; min-height: 0; }
   to { opacity: 1; transform: none; }
 }
 
+/* 滚动揭示：首屏以下的板块进入视口时，错峰淡入上移（useReveal.js 驱动）。
+   只挂在「非 float-card 的容器」上，和卡片自身进场动画互不抢 transform。
+   不支持 IntersectionObserver 时由 JS 直接 is-in；减弱动效偏好下恒可见。 */
+.u-reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition:
+    opacity .6s cubic-bezier(.16, .84, .44, 1) var(--d, 0s),
+    transform .6s cubic-bezier(.16, .84, .44, 1) var(--d, 0s);
+}
+.u-reveal.is-in { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  .u-reveal { opacity: 1 !important; transform: none !important; transition: none; }
+}
+
 /* 悬停微抬升：纸卡像被指尖掀起一点（A24 / itomdev 的纸质手感） */
 .dashboard-container.is-scroll .float-card {
   transition: transform .32s ease, box-shadow .32s ease;
