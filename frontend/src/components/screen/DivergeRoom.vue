@@ -1,15 +1,16 @@
 <template>
   <!--
     ============================================================
-    口碑分歧展厅 · 左右分屏（参考 A24 影片展 vs 数据对照）
+    口碑分歧展厅 · 编辑式对照跨页
     ------------------------------------------------------------
-    与"左中右三块"不同，这里是一刀切的左右分屏：
-      左半 = 观众评分分化榜（A24 海报圆盘展）
-      右半 = 上半「豆瓣 vs TMDB 分歧散点」+ 下半「豆瓣口碑」
-    两张内容气质迥异，并排对照，一眼看懂"两个平台的口碑不一定一致"。
+    2026-11-06 大调整修复：原根节点是 display:grid，Hero 没有显式网格定位，
+    被自动布局挤到页面中部（首屏看不到标题）。改为 flex 纵向 + 内层 .dr__grid
+    承载左右对照，Hero / 章节标题独占整行，恢复「封面 → 分章 → 展品」的节奏。
+    左半 = 观众评分分化榜（A24 海报圆盘展）
+    右半 = 分歧散点 + 豆瓣口碑 + 平台分歧榜
     ============================================================
-  -->
-  <div ref="root" class="diverge-room">
+    -->
+  <div ref="root" class="diverge-room" v-sketch="{ sel:'.room-hero, .float-card', stagger:0.07, maxDelay:0.9 }">
     <RoomHero
       icon="⚖️"
       kicker="Two Platforms, One Film"
@@ -19,23 +20,32 @@
       :tags="['平台分歧', 'ROI 箱线', '评分断层']"
       :stats="heroStats"
     />
-    <section class="dr__left float-card">
-      <PolarizingBoard :polarizing="polarizing" />
-    </section>
-    <div class="dr__right">
-      <section class="dr__cell float-card">
-        <DivergenceChart :divergence="divergence" />
+
+    <RoomSection no="01" zh="同一部片，两种口碑" en="One Film · Two Scores"
+      lead="左边是被观众撕裂的影片，右边是两套评分体系的正面交锋。分数差得越多，越值得看一眼。" />
+
+    <div class="dr__grid">
+      <section class="dr__left float-card">
+        <PolarizingBoard :polarizing="polarizing" />
       </section>
-      <section class="dr__cell dr__cell--dbp float-card">
-        <div class="dr__cell-h">豆瓣口碑</div>
-        <div class="dr__cell-body">
-          <DoubanPanel :douban="douban" />
-        </div>
-      </section>
-      <section class="dr__cell dr__cell--gap float-card">
-        <GapBoard :divergence="divergence" />
-      </section>
+      <div class="dr__right">
+        <section class="dr__cell float-card">
+          <DivergenceChart :divergence="divergence" />
+        </section>
+        <section class="dr__cell dr__cell--dbp float-card">
+          <div class="dr__cell-h">豆瓣口碑</div>
+          <div class="dr__cell-body">
+            <DoubanPanel :douban="douban" />
+          </div>
+        </section>
+        <section class="dr__cell dr__cell--gap float-card">
+          <GapBoard :divergence="divergence" />
+        </section>
+      </div>
     </div>
+
+    <RoomSection no="02" zh="回报的四个分位" en="Return by Quartile"
+      lead="同一类型里，票房回报能差多远？箱线把最低、四分位、中位与最高一次摊开。" />
 
     <!-- 第四层：各类型 ROI 四分位箱线（q1/中位/q3 由后端现算） -->
     <section class="dr__deep u-reveal">
@@ -55,6 +65,7 @@ import DoubanPanel from './DoubanPanel.vue'
 import GapBoard from './GapBoard.vue'
 import RoiBoxPanel from './RoiBoxPanel.vue'
 import RoomHero from './RoomHero.vue'
+import RoomSection from './RoomSection.vue'
 import { useReveal } from '../../composables/useReveal.js'
 
 const root = ref(null)
@@ -77,24 +88,32 @@ const heroStats = computed(() => [
 </script>
 
 <style scoped>
+/* 2026-11-06：height:auto + 明确分层，Hero / 章节独占整行，
+   左右对照栅格给足高度，三块右栏卡片不再被压扁 */
 .diverge-room {
-  height: 100%;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: minmax(0, 1fr) clamp(232px, 27vh, 278px);
-  gap: 14px;
-}
-.dr__left { grid-column: 1; grid-row: 1; min-height: 0; overflow: hidden; }
-.dr__deep { grid-column: 1 / span 2; grid-row: 2; min-height: 0; }
-
-.dr__right {
-  grid-column: 2;
-  grid-row: 1;
+  height: auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 20px;
+}
+/* 内层对照栅格：只装左右两块 */
+.dr__grid {
+  flex: 0 0 auto;
+  height: clamp(720px, 86vh, 900px);
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+.dr__left { min-height: 0; overflow: hidden; }
+.dr__deep { flex: 0 0 clamp(300px, 36vh, 380px); min-height: 0; }
+
+.dr__right {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 .dr__cell {
   flex: 1 1 0;
@@ -120,7 +139,7 @@ const heroStats = computed(() => [
 }
 .dr__cell-body { flex: 1; min-height: 0; overflow: auto; }
 
-@media (max-width: 1180px) {
-  .diverge-room { grid-template-columns: 1fr 1fr; }
+@media (max-width: 900px) {
+  .dr__grid { grid-template-columns: 1fr; }
 }
 </style>

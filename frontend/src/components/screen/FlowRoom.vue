@@ -8,7 +8,7 @@
     像展览里的两块说明牌，不再塞进左右两翼。
     ============================================================
   -->
-  <div ref="root" class="flow-room">
+  <div ref="root" class="flow-room" v-sketch="{ sel:'.room-hero, .float-card', stagger:0.07, maxDelay:0.9 }">
     <RoomHero
       icon="🌊"
       kicker="Currents of Time"
@@ -86,29 +86,31 @@ const heroStats = computed(() => [
 </script>
 
 <style scoped>
+/* 2026-11-06 大调整：Hero/章节放大后，原来 flex:1 的桑基主图被压成扁条。
+   改为 height:auto + 每层明确高度，长页按内容自然舒展，图表不再被挤压。 */
 .flow-room {
-  height: 100%;
+  height: auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 20px;
 }
 .fr__top {
-  flex: 1 1 0;
+  flex: 0 0 clamp(400px, 48vh, 520px);
   min-height: 0;
   overflow: hidden;
 }
 .fr__bottom {
-  flex: 1.22 1 0;
+  flex: 0 0 clamp(300px, 36vh, 380px);
   min-height: 0;
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
-  gap: 14px;
+  gap: 20px;
 }
 .fr__cell { min-height: 0; overflow: auto; }
 
 /* 年代胶片：纸面接触印相条，固定高度铺满页面底部 */
 .fr__rail { flex: 0 0 clamp(178px, 21vh, 204px); min-height: 0; overflow: hidden; padding: 9px 14px; }
 /* 三层桑基 / 年代热力：固定高度，页面自然变长，不挤压上方主图 */
-.fr__deep { flex: 0 0 clamp(232px, 27vh, 278px); min-height: 0; }
+.fr__deep { flex: 0 0 clamp(300px, 36vh, 380px); min-height: 0; }
 </style>

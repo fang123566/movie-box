@@ -92,6 +92,7 @@
         <!-- 星图厅：3D 星系在底层透出，这里只放一张悬浮读图卡 + 右上情感分布卡 -->
         <GalaxyRoom
           v-if="view === 'galaxy'"
+          v-sketch="{ sel:'.float-card', stagger:0.08, maxDelay:0.9 }"
           :avg-rating="avgRating"
           :arm-count="armCount"
           :sentiment="sentiment"

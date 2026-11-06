@@ -380,6 +380,12 @@ async function openBox(p) {
   check('左翼票房榜十行', bog.rankRows === 10, `rows=${bog.rankRows}`)
   check('右翼年度趋势图渲染', bog.trendCanvas > 100, `canvas=${bog.trendCanvas}`)
 
+  // 2026-11-06：策展式大封面 + 章节标题把画廊推到首屏之下，
+  // 房间滚动容器是 .dashboard-container（window.scrollY 恒为 0），
+  // 交互前先把画廊场景滚进视口，否则按首屏坐标点击会落在视口外。
+  await page.evaluate(() => document.querySelector('.bog__scene').scrollIntoView({ block: 'center' }))
+  await sleep(800)
+
   // 点相框 → 详情纸卡（票房/预算/ROI 四格）
   const framePt = await page.evaluate(() => {
     const r = document.querySelectorAll('.bog__frame')[2].getBoundingClientRect()

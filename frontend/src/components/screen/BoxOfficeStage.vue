@@ -9,7 +9,7 @@
   整间房不再有左右两翼，区别于其他"左图右表"的展厅。
 -->
 <template>
-  <div ref="root" class="box-stage">
+  <div ref="root" class="box-stage" v-sketch="{ sel:'.room-hero, .box-stage__cell, .box-stage__extras, .box-stage__deep, .bog__frame', stagger:0.035, maxDelay:1.1 }">
     <RoomHero
       icon="🎬"
       kicker="Box Office"
@@ -19,6 +19,9 @@
       :tags="['十亿俱乐部', '投资回报', '相框画廊']"
       :stats="heroStats"
     />
+    <!-- 章节在前、展品在后：恢复「分章 → 展品」的策展节奏
+         （2026-11-06 修正：此前编号排在展品之后，读起来像给上一节做注脚） -->
+    <RoomSection no="01" zh="全球票房画廊" en="Box Office Gallery" lead="全球票房 TOP 影片挂在一条绳上，滚轮沿绳浏览，点框看档案。" />
     <div class="box-stage__gallery">
       <BoxOfficeGallery
         :gallery="gallery"
@@ -29,8 +32,7 @@
       />
     </div>
 
-    <RoomSection no="01" zh="全球票房画廊" en="Box Office Gallery" lead="全球票房 TOP 影片挂在一条绳上，滚轮沿绳浏览，点框看档案。" />
-
+    <RoomSection no="02" zh="榜单与年度趋势" en="Top 10 · Yearly Trend" lead="左为十亿俱乐部榜单，右为各年度票房走势，看清水涨船高的年份。" />
     <div class="box-stage__dock u-reveal">
       <div class="box-stage__cell box-stage__cell--rank">
         <BoxOfficeRank
@@ -48,8 +50,7 @@
       </div>
     </div>
 
-    <RoomSection no="02" zh="榜单与年度趋势" en="Top 10 · Yearly Trend" lead="左为十亿俱乐部榜单，右为各年度票房走势，看清水涨船高的年份。" />
-
+    <RoomSection no="03" zh="总账 · 回报 · 类型" en="Ledger · ROI · Genre" lead="从票房总账到投资回报，再到各类型票房占比，看清钱去了哪里。" />
     <!-- 第三层：票房总账 / 投资回报 / 类型票房（用户要求"数据要多一点"） -->
     <div class="box-stage__extras u-reveal" style="--d:.08s">
       <BoxExtras
@@ -62,8 +63,7 @@
       />
     </div>
 
-    <RoomSection no="03" zh="总账 · 回报 · 类型" en="Ledger · ROI · Genre" lead="从票房总账到投资回报，再到各类型票房占比，看清钱去了哪里。" />
-
+    <RoomSection no="04" zh="票房与口碑的相关" en="Correlation · Regression" lead="预算花得多就一定卖得好？把散点、相关系数与回归线摊开，看钱和口碑到底有多相关。" />
     <!-- 第四层：相关矩阵 / 预算×票房散点回归（Pearson r 与 R² 由后端现算） -->
     <div class="box-stage__deep u-reveal" style="--d:.16s">
       <CorrelationPanel :correlations="correlations" />
@@ -134,11 +134,12 @@ const heroStats = computed(() => [
 .box-stage__gallery :deep(.bog) { min-height: 0; }
 
 /* 底部两栏配套：全球票房榜 + 年度票房趋势（收编自原左右两翼）。
-   flex:1 吃掉画廊让出的全部剩余高度 —— 这样 TOP10 十条 + 趋势图都能完整显示，
-   矮屏时榜单内部自行滚动，不再静默裁掉后面几行。 */
+   2026-11-05 修复：父级 .box-stage 改为 height:auto（内容定高），
+   这里不能再 flex:1 1 0（无剩余空间会塌成 0），改为固定最小高度自撑：
+   TOP10 十条 + 趋势图都能完整显示，矮屏时榜单内部自行滚动。 */
 .box-stage__dock {
-  flex: 1 1 0;
-  min-height: 0;
+  flex: 0 0 auto;
+  min-height: 440px;
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;

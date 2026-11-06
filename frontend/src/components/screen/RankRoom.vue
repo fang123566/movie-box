@@ -8,7 +8,7 @@
     手绘纸框 + 硬阴影，直接铺在暖白纸面上（不含左右两翼）。
     ============================================================
   -->
-  <div ref="root" class="rank-room">
+  <div ref="root" class="rank-room" v-sketch="{ sel:'.room-hero, .float-card', stagger:0.07, maxDelay:0.9 }">
     <RoomHero
       icon="📈"
       kicker="Word of Mouth"
@@ -18,6 +18,9 @@
       :tags="['口碑变迁', '编辑精选', '类型雷达']"
       :stats="heroStats"
     />
+    <RoomSection no="01" zh="口碑位次的十年" en="A Decade of Climbs"
+      lead="一条曲线是一个类型：谁一路登顶，谁在十年里悄悄滑出榜单。右侧是编辑精选与类型榜。" />
+
     <div class="rr__grid">
       <section class="rr__main float-card">
         <BumpChart :matrix="matrix" />
@@ -42,12 +45,15 @@
           <PosterRail :movies="movies" />
         </section>
       </div>
-
-      <!-- 第四层：类型多维画像雷达（5 个维度由后端现算，可放大细读） -->
-      <section class="rr__deep u-reveal" style="--d:.1s">
-        <GenreRadarPanel :correlations="correlations" />
-      </section>
     </div>
+
+    <RoomSection no="02" zh="类型的多维画像" en="Genre Profiles · Radar"
+      lead="把口碑、热度、产量、评分稳定性摊到一张雷达上，看清每个类型的性格。" />
+
+    <!-- 第四层：类型多维画像雷达（5 个维度由后端现算，可放大细读） -->
+    <section class="rr__deep u-reveal" style="--d:.1s">
+      <GenreRadarPanel :correlations="correlations" />
+    </section>
   </div>
 </template>
 
@@ -64,6 +70,7 @@ import DirectorBoard from './DirectorBoard.vue'
 import PosterRail from './PosterRail.vue'
 import GenreRadarPanel from './GenreRadarPanel.vue'
 import RoomHero from './RoomHero.vue'
+import RoomSection from './RoomSection.vue'
 import { useReveal } from '../../composables/useReveal.js'
 
 const root = ref(null)
@@ -87,20 +94,25 @@ const heroStats = computed(() => [
 </script>
 
 <style scoped>
+/* 2026-11-06 大调整：height:auto + 明确分层，避免 flex:1 子项在
+   父级 auto 高度里塌缩（历史坑：rank 侧栏曾被压成 88px） */
 .rank-room {
-  height: 100%;
+  height: auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 20px;
 }
+/* rr__deep 移出栅格改由 flex 独占一行（配合章节标题），
+   栅格从 3 行收成 2 行，主图多吃一行空间 */
 .rr__grid {
-  flex: 1 1 0;
+  flex: 0 0 auto;
+  height: clamp(700px, 84vh, 880px);
   min-height: 0;
   display: grid;
   grid-template-columns: 1fr 320px;
-  grid-template-rows: minmax(0, 1fr) clamp(222px, 26vh, 250px) clamp(232px, 27vh, 272px);
-  gap: 14px;
+  grid-template-rows: minmax(0, 1fr) clamp(222px, 26vh, 250px);
+  gap: 20px;
 }
 .rr__main { grid-column: 1; grid-row: 1; min-height: 0; overflow: hidden; }
 
@@ -123,7 +135,7 @@ const heroStats = computed(() => [
   gap: 14px;
 }
 .rr__cell { min-height: 0; overflow: hidden; padding: 10px 14px; }
-.rr__deep { grid-column: 1 / span 2; grid-row: 3; min-height: 0; }
+.rr__deep { flex: 0 0 clamp(232px, 27vh, 272px); min-height: 0; }
 .rr__side-h {
   flex: none;
   font-size: 12.5px;

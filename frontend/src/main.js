@@ -21,12 +21,16 @@ import './styles/space.css'
 // 全屏 HUD 大屏（/screen）：100vh 不滚动 + 三区五块定位 + 玻璃拟态切角面板。
 // 全局引入是因为 /analytics 第 07 章的「进入大屏」入口卡也复用其中样式。
 import './styles/universe.css'
+// 手绘「自我完成」揭示指令（itomdev 招牌效果）：v-sketch
+import { sketch } from './directives/sketch.js'
 
 const app = createApp(App)
 
 app.use(router)
 // 入场动效：@vueuse/motion（v-motion 指令 / <Motion> 组件）
 app.use(MotionPlugin)
+// 全局指令：v-sketch 给卡片/画廊框加手绘自我完成描边
+app.directive('sketch', sketch)
 
 // 全局错误处理：组件抛错不该留下白屏，至少留痕
 app.config.errorHandler = (err, _instance, info) => {
