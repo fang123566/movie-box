@@ -151,8 +151,8 @@ docker-compose up -d
 一条命令起来三个容器（ES + 后端 + 前端），**首次启动自动完成**：
 
 1. 等 ES 就绪（compose 健康检查 + 入口再兜一层等待）；
-2. 检测到索引缺失时，用**打进镜像的 processed 数据**自动建库导数据
-   （488 部电影 + 49,873 条影评，约 15 秒，幂等可重跑）；
+2. 检测到索引缺失时，用**镜像内 `data_lake/processed/` 的全量数据**自动建库导数据
+   （492 部电影 + 52,223 条影评，幂等可重跑；另有 news / 院线热映 / 预告片三个小索引）；
 3. 启动 uvicorn，nginx 托管前端并反代 `/api`。
 
 然后打开：
@@ -164,7 +164,9 @@ docker-compose up -d
 | 健康检查 | <http://localhost:8000/api/v1/health> | 含 ES 连通性 |
 | Kibana（可选） | <http://localhost:5601> | `--profile tools up -d` 才起 |
 
-> 数据已 bake 进后端镜像，**不需要**在宿主机准备数据文件或先跑采集管线。
+> 全量数据（processed 的 492 部 / 52,223 条 + analysis 打分明细 + 三个小索引源）**已随仓库入库**，
+> 并在 build 时打进后端镜像：clone 后直接 `up` 就能用，**不需要**在宿主机准备数据文件或先跑采集管线。
+> 仓库内 `reviews.jsonl` 约 93 MB，clone 体积因此较大；这是为了让别人一次跑通而做的取舍。
 > 想清库重来：`docker-compose down -v && docker-compose up -d`，会重新自动导一遍。
 
 ### 方式 B · 本机开发（采集 / 改代码 / 调参）
