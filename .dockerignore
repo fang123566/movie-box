@@ -20,7 +20,12 @@ __pycache__
 
 # 数据湖里的大块头：镜像只带 processed（可直接入库）与 analysis（洞察产物）
 data_lake/raw
-data_lake/interim
+# 2026-11-17：interim 整目录曾挡住 run_index 的三个 fallback 源，
+# 别人 build 后 news / 院线热映 / 预告片三块数据为空；此处放行这三个小文件（<1MB）。
+data_lake/interim/*
+!data_lake/interim/news.jsonl
+!data_lake/interim/douban_nowplaying.jsonl
+!data_lake/interim/tmdb_videos.jsonl
 data_lake/kaggle_reviews
 data_lake/kaggle_reviews_demo
 data_lake/imdb_datasets
