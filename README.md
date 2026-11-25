@@ -1660,3 +1660,16 @@ docker-compose --profile tools up -d # 额外起 Kibana
 - **不采集**豆瓣等存在反爬限制或未授权抓取的平台。
 - 所有采集请求遵守各平台的服务条款与速率限制（脚本内置限速与重试）。
 - API Key 一律通过 `.env` 注入，不硬编码、不入库。
+
+---
+
+## 项目展示
+
+以下截图来自仓库 `origin`（movie-recommendation-system-main）的提交 `ae9c5c7`（2026-05-30），
+为原系统界面记录；新栈界面以浏览器中 `http://localhost:8080` 实际渲染为准。
+
+<img width="1416" height="888" alt="项目展示 1" src="https://github.com/user-attachments/assets/c3ea39e3-ba05-4199-bf0c-b8a3df512357" />
+<img width="1364" height="876" alt="项目展示 2" src="https://github.com/user-attachments/assets/0d000fd4-7b44-45f4-91c3-40e4303b2a65" />
+<img width="1398" height="434" alt="项目展示 3" src="https://github.com/user-attachments/assets/0aab1ba4-3011-4fd4-bb2a-521985b127d5" />
+<img width="1366" height="882" alt="项目展示 4" src="https://github.com/user-attachments/assets/54402b5e-5e38-46be-8b79-e4868f45b595" />
+<img width="1376" height="866" alt="项目展示 5" src="https://github.com/user-attachments/assets/2a0b8002-5783-42fc-8e25-6d59bf88e662" />
