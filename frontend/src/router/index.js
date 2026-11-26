@@ -104,6 +104,14 @@ const routes = [
     component: () => import('../views/UniverseScreen.vue'),
     meta: { title: '影评洞察', hideFooter: true },
   },
+  {
+    // 采集流水线演示中心（同学贡献）：纯前端动画演示采集→解析→清洗→入库→检索，
+    // 不触发真实爬虫、不写库，用于课程答辩展示数据流向。
+    path: '/dashboard/crawl',
+    name: 'crawl-dashboard',
+    component: () => import('../views/CrawlDemoView.vue'),
+    meta: { title: '爬虫采集流水线演示中心', hideFooter: true },
+  },
   // 未匹配路径回首页（检索平台没有 404 页的必要时不浪费一页）
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ]

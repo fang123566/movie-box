@@ -72,7 +72,7 @@ function goMovie(m) {
       <HeroDiscs v-if="!loading && hot.length" :movies="hot" />
       <div class="hero__inner">
         <h1 class="hero__title">搜电影，也可以很好玩</h1>
-        <p class="hero__sub">影片与影评检索 · 口碑分析 · 随机盲盒 · 足迹地图</p>
+        <p class="hero__sub">影片与影评检索 · 口碑分析 · 随机盲盒 · 采集演示</p>
 
         <div class="hero__searchrow">
           <GlobalSearch size="lg" />
